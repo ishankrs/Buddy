@@ -17,8 +17,8 @@ Buddy runs as `@buddy` in VS Code Chat or in a dedicated sidebar panel. It keeps
 **From source (development)**
 
 ```bash
-git clone https://github.com/ishankrs/buddy.git
-cd buddy
+git clone https://github.com/ishankrs/Buddy.git
+cd Buddy
 npm install
 npm run compile
 ```

@@ -8,12 +8,12 @@
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ishankrs/buddy.git"
+    "url": "https://github.com/ishankrs/Buddy.git"
   },
   "bugs": {
-    "url": "https://github.com/ishankrs/buddy/issues"
+    "url": "https://github.com/ishankrs/Buddy/issues"
   },
-  "homepage": "https://github.com/ishankrs/buddy#readme",
+  "homepage": "https://github.com/ishankrs/Buddy#readme",
   "engines": {
     "vscode": "^1.95.0"
   },

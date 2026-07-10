@@ -5,7 +5,4 @@ out/
 *.vsix
 .DS_Store
 
-test/
-src/test/
-tsconfig.test.json
 scripts/

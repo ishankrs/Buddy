@@ -1,0 +1,29 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+src/**
+test/**
+out/**
+scripts/**
+.git/**
+.gitignore
+.eslintrc*
+.prettier*
+*.vsix
+buddy-*.vsix
+
+# Build tooling (not needed at runtime)
+esbuild.js
+tsconfig.json
+tsconfig.test.json
+**/*.ts
+!dist/**
+
+# Source maps (dev only — saves ~3MB in VSIX)
+**/*.map
+
+# Dev / test artifacts
+*.log
+.DS_Store
+coverage/
+.nyc_output/

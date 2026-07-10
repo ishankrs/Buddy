@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+.vscode-test/
+*.vsix
+.DS_Store
+
+test/
+src/test/
+tsconfig.test.json
+scripts/

@@ -1,0 +1,335 @@
+{
+  "name": "buddy",
+  "displayName": "Buddy",
+  "description": "Coding agent for VS Code — multi-provider LLM with tools",
+  "version": "0.2.0",
+  "publisher": "buddy",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ishankrs/buddy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ishankrs/buddy/issues"
+  },
+  "homepage": "https://github.com/ishankrs/buddy#readme",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:buddy.selectProviderModel",
+    "onCommand:buddy.selectModel",
+    "onCommand:buddy.setApiKey",
+    "onCommand:buddy.openPanel"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "buddy-sidebar",
+          "title": "Buddy",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "buddy-sidebar": [
+        {
+          "type": "webview",
+          "id": "buddy.panel",
+          "name": "Chat",
+          "when": "config.buddy.uiMode != chat"
+        }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "buddy.chat",
+        "name": "buddy",
+        "description": "Coding agent for your workspace",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "plan",
+            "description": "Create a plan before executing changes"
+          },
+          {
+            "name": "think",
+            "description": "Extended reasoning — show thinking before acting"
+          },
+          {
+            "name": "debug",
+            "description": "Debug mode — focus on errors, root cause, and verification"
+          },
+          {
+            "name": "swarm",
+            "description": "Swarm mode — parallel workers decompose and solve the task"
+          },
+          {
+            "name": "subagent",
+            "description": "Spawn a focused subagent for a scoped task"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "buddy.setApiKey",
+        "title": "Set API Key",
+        "category": "Buddy"
+      },
+      {
+        "command": "buddy.configureEndpoint",
+        "title": "Configure API Endpoint (URL + Key)",
+        "category": "Buddy"
+      },
+      {
+        "command": "buddy.clearMemory",
+        "title": "Clear Conversation Memory",
+        "category": "Buddy"
+      },
+      {
+        "command": "buddy.openPanel",
+        "title": "Open Panel",
+        "category": "Buddy",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "buddy.switchUi",
+        "title": "Switch UI (Chat / Panel / Both)",
+        "category": "Buddy"
+      },
+      {
+        "command": "buddy.setWebSearchApiKey",
+        "title": "Set Web Search API Key",
+        "category": "Buddy"
+      },
+      {
+        "command": "buddy.selectProviderModel",
+        "title": "Select Provider and Model",
+        "category": "Buddy",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "buddy.selectModel",
+        "title": "Select Model",
+        "category": "Buddy",
+        "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "buddy.openLlmSettings",
+        "title": "Open LLM Settings",
+        "category": "Buddy",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "buddy.selectProviderModel" },
+        { "command": "buddy.selectModel" },
+        { "command": "buddy.openLlmSettings" },
+        { "command": "buddy.setApiKey" },
+        { "command": "buddy.configureEndpoint" },
+        { "command": "buddy.openPanel" },
+        { "command": "buddy.switchUi" },
+        { "command": "buddy.clearMemory" },
+        { "command": "buddy.setWebSearchApiKey" }
+      ],
+      "view/title": [
+        {
+          "command": "buddy.selectProviderModel",
+          "when": "view == buddy.panel",
+          "group": "navigation@1"
+        },
+        {
+          "command": "buddy.selectModel",
+          "when": "view == buddy.panel",
+          "group": "navigation@2"
+        },
+        {
+          "command": "buddy.openLlmSettings",
+          "when": "view == buddy.panel",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Buddy",
+      "properties": {
+        "buddy.provider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "anthropic",
+            "openrouter",
+            "ollama",
+            "custom"
+          ],
+          "default": "openai",
+          "description": "LLM provider to use. Use 'openrouter' for OpenRouter, or 'custom' for any OpenAI-compatible API with buddy.baseUrl."
+        },
+        "buddy.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "API base URL for the custom provider (e.g. https://api.openai.com/v1 or http://localhost:8080/v1). Required when buddy.provider is custom."
+        },
+        "buddy.openaiBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional OpenAI API base URL override (Azure, proxy, etc.)"
+        },
+        "buddy.anthropicBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Anthropic API base URL override (proxy, etc.)"
+        },
+        "buddy.openrouterBaseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "OpenRouter API base URL (OpenAI-compatible). Get a key at openrouter.ai/keys"
+        },
+        "buddy.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model name (leave empty for provider default). OpenRouter uses IDs like openai/gpt-4o."
+        },
+        "buddy.maxIterations": {
+          "type": "number",
+          "default": 25,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum agent tool-calling iterations per request"
+        },
+        "buddy.autoApproveReadOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically run read-only tools without confirmation"
+        },
+        "buddy.trustedMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip confirmation for terminal commands (not recommended)"
+        },
+        "buddy.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API base URL"
+        },
+        "buddy.maxMemoryTurns": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum conversation turns to retain in memory"
+        },
+        "buddy.swarmWorkers": {
+          "type": "number",
+          "default": 3,
+          "minimum": 2,
+          "maximum": 6,
+          "description": "Number of parallel workers in /swarm mode"
+        },
+        "buddy.debugVerbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log tool calls and results to the Buddy Debug output channel (also enabled in /debug mode)"
+        },
+        "buddy.maxSubagentIterations": {
+          "type": "number",
+          "default": 12,
+          "minimum": 3,
+          "maximum": 50,
+          "description": "Maximum tool iterations per subagent run"
+        },
+        "buddy.maxSubagentDepth": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "maximum": 3,
+          "description": "How many levels of nested spawn_subagent calls are allowed (0 disables spawning)"
+        },
+        "buddy.uiMode": {
+          "type": "string",
+          "enum": [
+            "both",
+            "chat",
+            "panel"
+          ],
+          "default": "both",
+          "description": "Where Buddy appears: VS Code Chat (@buddy), custom sidebar panel, or both"
+        },
+        "buddy.webSearch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable search_web and fetch_url tools for public web research"
+        },
+        "buddy.webSearch.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "duckduckgo",
+            "serper",
+            "brave",
+            "google",
+            "tavily"
+          ],
+          "default": "auto",
+          "description": "Web search provider. auto picks Serper/Brave/Tavily/Google if keys exist, else DuckDuckGo. Serper gives Google-quality results."
+        },
+        "buddy.webSearch.maxResults": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Default number of web search results"
+        },
+        "buddy.webSearch.googleCx": {
+          "type": "string",
+          "default": "",
+          "description": "Google Programmable Search Engine ID (cx) — required when buddy.webSearch.provider is google"
+        },
+        "buddy.webSearch.fetchMaxChars": {
+          "type": "number",
+          "default": 12000,
+          "minimum": 1000,
+          "maximum": 50000,
+          "description": "Max characters returned by fetch_url"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js",
+    "compile:test": "tsc -p tsconfig.test.json",
+    "watch": "node esbuild.js --watch",
+    "check": "tsc --noEmit",
+    "test:unit": "tsx --test test/unit/*.test.ts",
+    "test:integration": "npm run compile && npm run compile:test && node out/test/runTest.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "package": "npm run compile && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.25.0",
+    "glob": "^11.0.1",
+    "mocha": "^11.1.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "openai": "^4.77.0"
+  }
+}

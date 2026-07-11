@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { getToolDefinitions } from '../../tools/registry';
 
-const EXTENSION_ID = 'buddy.buddy';
+const EXTENSION_ID = 'ishankrs.buddy-ai-coding-agent';
 
 suite('Buddy extension integration', () => {
   test('extension is present and activates', async () => {

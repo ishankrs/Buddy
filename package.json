@@ -1,9 +1,9 @@
 {
-  "name": "buddy",
-  "displayName": "Buddy",
-  "description": "Coding agent for VS Code — multi-provider LLM with tools",
-  "version": "0.2.0",
-  "publisher": "buddy",
+  "name": "buddy-ai-coding-agent",
+  "displayName": "Buddy AI Coding Agent",
+  "description": "AI coding agent for VS Code — chat with @buddy, edit files, run terminal, search the web. Multi-provider LLM (OpenAI, Anthropic, OpenRouter, Ollama).",
+  "version": "0.2.1",
+  "publisher": "ishankrs",
   "license": "MIT",
   "icon": "media/icon.png",
   "repository": {
@@ -21,6 +21,18 @@
     "AI",
     "Chat"
   ],
+  "keywords": [
+    "ai",
+    "coding agent",
+    "code assistant",
+    "llm",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "openrouter",
+    "copilot",
+    "agent"
+  ],
   "activationEvents": [
     "onStartupFinished",
     "onCommand:buddy.selectProviderModel",
@@ -34,7 +46,7 @@
       "activitybar": [
         {
           "id": "buddy-sidebar",
-          "title": "Buddy",
+          "title": "Buddy AI",
           "icon": "media/icon.svg"
         }
       ]

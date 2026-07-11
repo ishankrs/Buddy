@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="media/icon.svg" width="96" height="96" alt="Buddy logo" />
+<img src="media/icon.png" width="96" height="96" alt="Buddy AI Coding Agent logo" />
 
-# Buddy
+# Buddy AI Coding Agent
 
-A coding agent for VS Code.
+An AI coding agent for VS Code.
 
 </div>
 
@@ -13,6 +13,14 @@ Ask questions in chat, let it read your repo, edit files, run commands, and sear
 Buddy runs as `@buddy` in VS Code Chat or in a dedicated sidebar panel. It keeps conversation context per workspace, shows diffs before applying edits, and asks before running terminal commands (unless you opt into trusted mode).
 
 ## Install
+
+**From the Marketplace**
+
+```bash
+code --install-extension ishankrs.buddy-ai-coding-agent
+```
+
+Or search **Buddy AI Coding Agent** in the Extensions view.
 
 **From source (development)**
 
@@ -31,7 +39,7 @@ Press **F5** in VS Code to open the Extension Development Host with Buddy loaded
 npm run package
 ```
 
-Then in VS Code: Extensions → `…` → **Install from VSIX…** → select `buddy-0.2.0.vsix`.
+Then in VS Code: Extensions → `…` → **Install from VSIX…** → select `buddy-ai-coding-agent-0.2.1.vsix`.
 
 ## Setup
 

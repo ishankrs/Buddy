@@ -2,6 +2,15 @@
 
 All notable changes to Buddy are documented in this file.
 
+## [0.2.1] - 2026-07-11
+
+### Changed
+
+- Marketplace extension ID: `ishankrs.buddy-ai-coding-agent`
+- Marketplace display name: **Buddy AI Coding Agent** (better search/discovery)
+- Added Marketplace keywords (AI, coding agent, LLM providers)
+- Sidebar title: Buddy AI
+
 ## [0.2.0] - 2026-07-10
 
 ### Added

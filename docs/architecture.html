@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buddy AI Coding Agent — Architecture</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose',
+      flowchart: { useMaxWidth: false, htmlLabels: true, curve: 'basis' },
+      sequence: { useMaxWidth: false, wrap: true },
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --nav-width: 240px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    nav {
+      width: var(--nav-width);
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 1.25rem 0;
+    }
+
+    nav h1 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 0 1rem 0.75rem;
+      color: var(--text);
+    }
+
+    nav p {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin: 0 1rem 1rem;
+    }
+
+    nav a {
+      display: block;
+      padding: 0.45rem 1rem;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      border-left: 2px solid transparent;
+    }
+
+    nav a:hover,
+    nav a.active {
+      color: var(--accent);
+      background: rgba(88, 166, 255, 0.08);
+      border-left-color: var(--accent);
+    }
+
+    main {
+      flex: 1;
+      min-width: 0;
+      padding: 2rem 2rem 4rem;
+      max-width: 1200px;
+    }
+
+    section {
+      margin-bottom: 3rem;
+      scroll-margin-top: 1.5rem;
+    }
+
+    section h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+    }
+
+    section .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 1rem;
+    }
+
+    .diagram-frame {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: auto;
+      max-height: 75vh;
+      padding: 1.5rem;
+      cursor: grab;
+    }
+
+    .diagram-frame:active {
+      cursor: grabbing;
+    }
+
+    .diagram-frame .mermaid {
+      display: flex;
+      justify-content: center;
+      min-width: min-content;
+    }
+
+    .diagram-frame svg {
+      max-width: none !important;
+      height: auto;
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface);
+      font-weight: 600;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85em;
+      background: rgba(110, 118, 129, 0.2);
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 768px) {
+      .layout { flex-direction: column; }
+      nav {
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      main { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <nav>
+      <h1>Buddy Architecture</h1>
+      <p>Scroll &amp; pan each diagram</p>
+      <a href="#overview">High-level overview</a>
+      <a href="#request-flow">Request flow</a>
+      <a href="#agent-modes">Agent modes</a>
+      <a href="#data-config">Data &amp; config</a>
+      <a href="#layers">Layer breakdown</a>
+      <a href="#source">Source layout</a>
+      <a href="#tools">Tools</a>
+      <a href="#providers">LLM providers</a>
+    </nav>
+
+    <main>
+      <section id="overview">
+        <h2>High-level overview</h2>
+        <p class="subtitle">Components and data flow across UI, agent core, LLM, and tools.</p>
+        <div class="diagram-frame">
+          <pre class="mermaid">
+flowchart TB
+    subgraph UI["User interfaces"]
+        Chat["@buddy Chat Participant<br/>(chat/participant.ts)"]
+        Panel["Sidebar Webview Panel<br/>(panel/BuddyPanelProvider.ts)"]
+        Cmds["Commands + Status Bar<br/>(extension.ts, llm/statusBar.ts)"]
+    end
+
+    subgraph Core["Agent core"]
+        Router["runBuddyRequest<br/>(agent/runBuddyRequest.ts)"]
+        Modes["Mode routing<br/>default · plan · think · debug · swarm · subagent"]
+        Loop["Agent loop<br/>(agent/loop.ts)"]
+        Swarm["Swarm orchestrator<br/>(agent/swarm.ts)"]
+        Sub["Subagent runner<br/>(agent/subagent.ts)"]
+    end
+
+    subgraph Context["Context layer"]
+        Gather["Context gatherer<br/>(context/gatherer.ts)"]
+        Mem["Session memory<br/>(agent/memory.ts)"]
+        Prompts["System prompts<br/>(agent/prompts.ts)"]
+    end
+
+    subgraph LLM["LLM layer"]
+        LlmRouter["Provider router<br/>(llm/router.ts)"]
+        OpenAI["OpenAI / OpenRouter<br/>(llm/openai.ts)"]
+        Anthropic["Anthropic<br/>(llm/anthropic.ts)"]
+        Ollama["Ollama<br/>(llm/ollama.ts)"]
+        Secrets["API keys<br/>(llm/secrets.ts → SecretStorage)"]
+    end
+
+    subgraph Tools["Tool layer"]
+        Registry["Tool registry<br/>(tools/registry.ts)"]
+        Read["read_file · list_files · search_workspace"]
+        Write["edit_file · run_terminal"]
+        Web["search_web · fetch_url"]
+        Spawn["spawn_subagent"]
+        Diff["Diff preview<br/>(diff/preview.ts)"]
+    end
+
+    subgraph VSCode["VS Code APIs"]
+        WS["Workspace / Editor / Terminal"]
+        ChatAPI["ChatResponseStream"]
+        Webview["WebviewView"]
+    end
+
+    Chat --> Router
+    Panel --> Router
+    Cmds --> LlmRouter
+
+    Router --> Modes
+    Modes --> Loop
+    Modes --> Swarm
+    Modes --> Sub
+    Swarm --> Loop
+    Sub --> Loop
+
+    Chat --> Gather
+    Panel --> Gather
+    Loop --> Gather
+    Loop --> Mem
+    Loop --> Prompts
+
+    Loop --> LlmRouter
+    LlmRouter --> OpenAI
+    LlmRouter --> Anthropic
+    LlmRouter --> Ollama
+    LlmRouter --> Secrets
+
+    Loop --> Registry
+    Registry --> Read
+    Registry --> Write
+    Registry --> Web
+    Registry --> Spawn
+    Write --> Diff
+    Spawn --> Loop
+
+    Read --> WS
+    Write --> WS
+    Web --> WS
+    Loop --> ChatAPI
+    Panel --> Webview
+          </pre>
+        </div>
+        <p class="hint">Scroll inside the box · drag to pan on trackpad</p>
+      </section>
+
+      <section id="request-flow">
+        <h2>Request flow</h2>
+        <p class="subtitle">Single user message from chat or panel through to response.</p>
+        <div class="diagram-frame">
+          <pre class="mermaid">
+sequenceDiagram
+    actor User
+    participant UI as Chat or Panel
+    participant Ctx as Context Gatherer
+    participant Mem as Session Memory
+    participant BuddyReq as runBuddyRequest
+    participant AgentLoop as Agent Loop
+    participant LLM as LLM Provider
+    participant Tools as Tool Registry
+    participant VSCode as VS Code APIs
+
+    User->>UI: user message and mode
+    UI->>Ctx: gatherContext
+    Ctx->>VSCode: editor and workspace context
+    Ctx-->>UI: context summary
+    UI->>Mem: load prior turns
+    UI->>BuddyReq: message stream history
+
+    alt swarm mode
+        BuddyReq->>BuddyReq: runSwarm
+    else subagent mode
+        BuddyReq->>BuddyReq: runSubagentMode
+    else default modes
+        BuddyReq->>AgentLoop: runAgentLoop
+    end
+
+    loop each iteration
+        AgentLoop->>LLM: messages and tool schemas
+        LLM-->>AgentLoop: text or tool calls
+        AgentLoop->>UI: stream response
+        AgentLoop->>Tools: execute tools
+        Tools->>VSCode: read edit terminal web
+        Tools-->>AgentLoop: tool results
+    end
+
+    AgentLoop-->>BuddyReq: assistant text
+    BuddyReq->>Mem: saveTurn
+    BuddyReq-->>UI: final response
+    UI-->>User: streamed reply
+          </pre>
+        </div>
+        <p class="hint">Scroll inside the box · drag to pan on trackpad</p>
+      </section>
+
+      <section id="agent-modes">
+        <h2>Agent modes</h2>
+        <p class="subtitle">How slash commands and natural language route to the agent loop.</p>
+        <div class="diagram-frame">
+          <pre class="mermaid">
+flowchart LR
+    Input["User message"] --> Resolve["resolveUserMessageAndMode"]
+
+    Resolve --> Default["default → agent loop"]
+    Resolve --> Plan["/plan → loop + plan prompt"]
+    Resolve --> Think["/think → loop + think stream"]
+    Resolve --> Debug["/debug → loop + debug logging"]
+    Resolve --> Swarm["/swarm → runSwarm"]
+    Resolve --> SubCmd["/subagent → runSubagentMode"]
+    Resolve --> SubNL["NL spawn subagent → subagent"]
+
+    Swarm --> W1["Worker 1"]
+    Swarm --> W2["Worker 2"]
+    Swarm --> W3["Worker N"]
+    W1 --> Loop["runAgentLoop"]
+    W2 --> Loop
+    W3 --> Loop
+
+    SubCmd --> SubLoop["runAgentLoop (scoped)"]
+    Spawn["spawn_subagent tool"] --> SubLoop
+          </pre>
+        </div>
+        <p class="hint">Scroll inside the box · drag to pan on trackpad</p>
+      </section>
+
+      <section id="data-config">
+        <h2>Data and configuration</h2>
+        <p class="subtitle">Settings, SecretStorage, and workspace memory.</p>
+        <div class="diagram-frame">
+          <pre class="mermaid">
+flowchart TB
+    subgraph Config["VS Code settings (buddy.*)"]
+        Provider["provider · model · baseUrl"]
+        Agent["maxIterations · trustedMode · uiMode"]
+        WebCfg["webSearch.*"]
+    end
+
+    subgraph Persist["Persistence"]
+        SS["SecretStorage<br/>API keys"]
+        WSState["WorkspaceState<br/>conversation memory"]
+    end
+
+    Config --> LlmRouter["llm/router.ts"]
+    Config --> Loop["agent/loop.ts"]
+    Config --> WebTools["tools/webTools.ts"]
+    SS --> Secrets["llm/secrets.ts"]
+    WSState --> Memory["agent/memory.ts"]
+          </pre>
+        </div>
+        <p class="hint">Scroll inside the box · drag to pan on trackpad</p>
+      </section>
+
+      <section id="layers">
+        <h2>Layer breakdown</h2>
+        <table>
+          <thead>
+            <tr><th>Layer</th><th>Key modules</th><th>Role</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><strong>Entry</strong></td><td><code>extension.ts</code></td><td>Activates chat, panel, commands, status bar, LM tools</td></tr>
+            <tr><td><strong>UI</strong></td><td><code>chat/participant.ts</code>, <code>panel/BuddyPanelProvider.ts</code></td><td>Two surfaces; panel uses webview + postMessage</td></tr>
+            <tr><td><strong>Routing</strong></td><td><code>agent/requestRouting.ts</code>, <code>agent/modes.ts</code></td><td>Slash commands + NL subagent detection</td></tr>
+            <tr><td><strong>Orchestration</strong></td><td><code>agent/runBuddyRequest.ts</code>, <code>agent/swarm.ts</code></td><td>Picks loop vs swarm vs subagent</td></tr>
+            <tr><td><strong>Agent loop</strong></td><td><code>agent/loop.ts</code>, <code>agent/thinkStream.ts</code></td><td>Multi-turn LLM ↔ tool cycle with streaming</td></tr>
+            <tr><td><strong>Context</strong></td><td><code>context/gatherer.ts</code>, <code>agent/prompts.ts</code></td><td>Editor/workspace context in system prompt</td></tr>
+            <tr><td><strong>Memory</strong></td><td><code>agent/memory.ts</code></td><td>Per-workspace turn history + token trimming</td></tr>
+            <tr><td><strong>LLM</strong></td><td><code>llm/router.ts</code>, provider modules</td><td>Multi-provider abstraction; keys in SecretStorage</td></tr>
+            <tr><td><strong>Tools</strong></td><td><code>tools/registry.ts</code></td><td>Eight tools; read-only auto-approve optional</td></tr>
+            <tr><td><strong>Safety</strong></td><td><code>diff/preview.ts</code></td><td>Diff before edit; terminal confirmation</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="source">
+        <h2>Source layout</h2>
+        <pre><code>src/
+├── extension.ts          # activate(): wires everything
+├── chat/                 # @buddy participant + stream adapters
+├── panel/                # sidebar webview UI
+├── agent/                # loop, modes, swarm, subagent, memory, prompts
+├── llm/                  # providers, router, secrets, status bar
+├── tools/                # tool registry + implementations
+├── context/              # editor/workspace context gathering
+├── diff/                 # edit preview before apply
+└── config/               # uiMode (chat / panel / both)</code></pre>
+      </section>
+
+      <section id="tools">
+        <h2>Tools</h2>
+        <table>
+          <thead>
+            <tr><th>Tool</th><th>Module</th><th>Read-only</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>read_file</code></td><td><code>tools/readTools.ts</code></td><td>Yes</td></tr>
+            <tr><td><code>list_files</code></td><td><code>tools/readTools.ts</code></td><td>Yes</td></tr>
+            <tr><td><code>search_workspace</code></td><td><code>tools/readTools.ts</code></td><td>Yes</td></tr>
+            <tr><td><code>edit_file</code></td><td><code>tools/writeTools.ts</code></td><td>No (diff preview)</td></tr>
+            <tr><td><code>run_terminal</code></td><td><code>tools/writeTools.ts</code></td><td>No (user approval)</td></tr>
+            <tr><td><code>search_web</code></td><td><code>tools/webTools.ts</code></td><td>Yes</td></tr>
+            <tr><td><code>fetch_url</code></td><td><code>tools/webTools.ts</code></td><td>Yes</td></tr>
+            <tr><td><code>spawn_subagent</code></td><td><code>tools/subagentTool.ts</code></td><td>Yes (nested loop)</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="providers">
+        <h2>LLM providers</h2>
+        <table>
+          <thead>
+            <tr><th>Provider ID</th><th>Implementation</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>openai</code></td><td><code>llm/openai.ts</code></td><td>Optional <code>buddy.openaiBaseUrl</code></td></tr>
+            <tr><td><code>anthropic</code></td><td><code>llm/anthropic.ts</code></td><td>Optional <code>buddy.anthropicBaseUrl</code></td></tr>
+            <tr><td><code>openrouter</code></td><td><code>llm/openai.ts</code></td><td>OpenAI-compatible; default OpenRouter URL</td></tr>
+            <tr><td><code>ollama</code></td><td><code>llm/ollama.ts</code></td><td>Local; no API key</td></tr>
+            <tr><td><code>custom</code></td><td><code>llm/openai.ts</code></td><td>Any OpenAI-compatible endpoint</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const navLinks = document.querySelectorAll('nav a');
+    const sections = document.querySelectorAll('main section[id]');
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            navLinks.forEach((link) => {
+              link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+            });
+          }
+        });
+      },
+      { rootMargin: '-20% 0px -70% 0px' }
+    );
+
+    sections.forEach((section) => observer.observe(section));
+  </script>
+</body>
+</html>

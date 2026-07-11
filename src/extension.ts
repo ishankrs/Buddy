@@ -55,7 +55,7 @@ function registerProviderCommands(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('buddy.openLlmSettings', async () => {
       await vscode.commands.executeCommand(
         'workbench.action.openSettings',
-        '@ext:buddy.buddy buddy.provider'
+        '@ext:ishankrs.buddy-ai-coding-agent buddy.provider'
       );
     })
   );

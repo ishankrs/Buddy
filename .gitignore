@@ -6,3 +6,13 @@ out/
 .DS_Store
 
 scripts/
+
+# Never commit API keys or local auth state (local-only storage).
+# opencode CLI auth lives in ~/.local/share/opencode/auth.json (outside repo),
+# Buddy VS Code keys live in OS keychain via SecretStorage — but guard anyway:
+.opencode/auth.json
+**/auth.json
+.env
+.env.*
+*.pem
+*.key

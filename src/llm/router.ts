@@ -6,7 +6,7 @@ import { getProviderBaseUrl, getProviderDefinition, resolveModelForProvider } fr
 import { ensureApiKey } from './secrets';
 import type { LLMProvider } from './types';
 
-export type ProviderId = 'openai' | 'anthropic' | 'openrouter' | 'ollama' | 'custom';
+export type ProviderId = 'openai' | 'anthropic' | 'openrouter' | 'ollama' | 'opencode' | 'custom';
 
 function getOptionalBaseUrl(key: string): string | undefined {
   const value = vscode.workspace.getConfiguration('buddy').get<string>(key, '').trim();
@@ -56,6 +56,19 @@ export async function getProvider(
     }
     case 'ollama':
       return createOllamaProvider(model);
+    case 'opencode': {
+      const apiKey = await ensureApiKey(context, 'opencode');
+      const baseURL = getProviderBaseUrl('opencode') ?? 'https://opencode.ai/zen/v1/chat/completions';
+      return createOpenAIProvider(apiKey, model, {
+        baseURL,
+        id: 'opencode',
+        defaultModel: getProviderDefinition('opencode').defaultModel,
+        defaultHeaders: {
+          'HTTP-Referer': 'https://github.com/ishankrs/Buddy',
+          'X-Title': 'Buddy VS Code Extension',
+        },
+      });
+    }
     case 'custom': {
       const apiKey = await ensureApiKey(context, 'custom');
       const baseURL = getRequiredBaseUrl();

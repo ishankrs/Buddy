@@ -240,8 +240,11 @@ src/
 | `openai` | `llm/openai.ts` | Optional `buddy.openaiBaseUrl` |
 | `anthropic` | `llm/anthropic.ts` | Optional `buddy.anthropicBaseUrl` |
 | `openrouter` | `llm/openai.ts` | OpenAI-compatible; default OpenRouter base URL |
+| `opencode` | `llm/openai.ts` | OpenCode Zen via `buddy.opencodeBaseUrl` (default `https://opencode.ai/zen/v1/chat/completions`); model list fetched live from `https://opencode.ai/zen/v1/models` (`llm/opencodeModels.ts`, 1h cache), FREE badge first, paid below; data notices in `llm/opencodeNotices.ts` |
 | `ollama` | `llm/ollama.ts` | Local; no API key |
 | `custom` | `llm/openai.ts` | Any OpenAI-compatible endpoint via `buddy.baseUrl` |
+
+API keys for all providers live only in VS Code SecretStorage (`llm/secrets.ts`); the repo also ships `opencode.json` + `AGENTS.md` + `.opencode/commands/` so opencode CLI/TUI can work on this codebase with local-only auth (`~/.local/share/opencode/auth.json`, never committed).
 
 ## Viewing diagrams
 

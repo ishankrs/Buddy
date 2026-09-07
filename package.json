@@ -38,6 +38,8 @@
     "onCommand:buddy.selectProviderModel",
     "onCommand:buddy.selectModel",
     "onCommand:buddy.setApiKey",
+    "onCommand:buddy.removeApiKey",
+    "onCommand:buddy.configureEndpoint",
     "onCommand:buddy.openPanel"
   ],
   "main": "./dist/extension.js",
@@ -98,6 +100,11 @@
         "category": "Buddy"
       },
       {
+        "command": "buddy.removeApiKey",
+        "title": "Remove API Key (local only)",
+        "category": "Buddy"
+      },
+      {
         "command": "buddy.configureEndpoint",
         "title": "Configure API Endpoint (URL + Key)",
         "category": "Buddy"
@@ -148,6 +155,7 @@
         { "command": "buddy.selectModel" },
         { "command": "buddy.openLlmSettings" },
         { "command": "buddy.setApiKey" },
+        { "command": "buddy.removeApiKey" },
         { "command": "buddy.configureEndpoint" },
         { "command": "buddy.openPanel" },
         { "command": "buddy.switchUi" },
@@ -182,10 +190,11 @@
             "anthropic",
             "openrouter",
             "ollama",
+            "opencode",
             "custom"
           ],
           "default": "openai",
-          "description": "LLM provider to use. Use 'openrouter' for OpenRouter, or 'custom' for any OpenAI-compatible API with buddy.baseUrl."
+          "description": "LLM provider to use. Use 'openrouter' for OpenRouter, 'opencode' for OpenCode Zen (opencode.ai/zen), or 'custom' for any OpenAI-compatible API with buddy.baseUrl."
         },
         "buddy.baseUrl": {
           "type": "string",
@@ -206,6 +215,11 @@
           "type": "string",
           "default": "https://openrouter.ai/api/v1",
           "description": "OpenRouter API base URL (OpenAI-compatible). Get a key at openrouter.ai/keys"
+        },
+        "buddy.opencodeBaseUrl": {
+          "type": "string",
+          "default": "https://opencode.ai/zen/v1/chat/completions",
+          "description": "OpenCode Zen API base URL (OpenAI-compatible chat/completions endpoint). Get a key at opencode.ai/zen. Only chat/completions models work here (e.g. kimi-k2.5, deepseek-v4-pro, glm-5.3)."
         },
         "buddy.model": {
           "type": "string",

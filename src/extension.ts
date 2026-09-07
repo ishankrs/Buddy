@@ -3,7 +3,7 @@ import {
   createChatParticipant,
   registerClearMemoryCommand,
 } from './chat/participant';
-import { configureCustomEndpoint, promptForApiKey, promptForBaseUrl } from './llm/secrets';
+import { configureCustomEndpoint, promptForApiKey, promptForBaseUrl, removeApiKey } from './llm/secrets';
 import { selectModelOnly, selectProviderAndModel } from './llm/selectProviderModel';
 import { PROVIDERS } from './llm/providerCatalog';
 import { registerProviderStatusBar } from './llm/statusBar';
@@ -157,7 +157,9 @@ function registerCoreCommands(context: vscode.ExtensionContext): void {
             ? 'anthropicBaseUrl'
             : selected === 'openrouter'
               ? 'openrouterBaseUrl'
-              : undefined;
+              : selected === 'opencode'
+                ? 'opencodeBaseUrl'
+                : undefined;
 
       if (baseUrlKey) {
         const setUrl = await vscode.window.showInformationMessage(
@@ -174,7 +176,26 @@ function registerCoreCommands(context: vscode.ExtensionContext): void {
         }
       }
 
-      vscode.window.showInformationMessage(`Buddy: API key saved for ${selected}.`);
+      vscode.window.showInformationMessage(`Buddy: API key saved for ${selected} (local SecretStorage only).`);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('buddy.removeApiKey', async () => {
+      const picked = await vscode.window.showQuickPick(
+        PROVIDERS.filter((p) => p.requiresApiKey).map((p) => ({
+          label: p.id,
+          description: p.description,
+        })),
+        { title: 'Select provider to remove local API key' }
+      );
+      if (!picked) {
+        return;
+      }
+      await removeApiKey(context, picked.label);
+      vscode.window.showInformationMessage(
+        `Buddy: Local API key removed for ${picked.label}.`
+      );
     })
   );
 }

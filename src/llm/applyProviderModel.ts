@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getProviderDefinition } from './providerCatalog';
 import { getConfiguredModel } from './providerConfig';
 import type { ProviderId } from './router';
+import { maybeShowOpencodeProviderNotice } from './opencodeNotices';
 import { ensureApiKey, getApiKey, promptForApiKey } from './secrets';
 
 export async function applyProviderSelection(
@@ -32,6 +33,10 @@ export async function applyProviderSelection(
         return false;
       }
     }
+  }
+
+  if (providerId === 'opencode') {
+    await maybeShowOpencodeProviderNotice(context);
   }
 
   return true;

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/kimi-k2.5",
+  "small_model": "opencode/deepseek-v4-flash",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "edit": "ask",
+    "bash": "ask",
+    "webfetch": "allow"
+  },
+  "formatter": true,
+  "lsp": true,
+  "snapshot": true,
+  "autoupdate": false
+}

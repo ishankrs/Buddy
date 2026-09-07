@@ -44,7 +44,7 @@ Then in VS Code: Extensions → `…` → **Install from VSIX…** → select `b
 ## Setup
 
 1. Open the Command Palette and run **Buddy: Select Provider and Model** (or use the dropdowns in the sidebar panel).
-2. Pick a provider and enter an API key when prompted. Keys are stored in VS Code SecretStorage — not in settings files.
+2. Pick a provider and enter an API key when prompted. Keys are stored **locally only** in VS Code SecretStorage (OS keychain) — never in settings files, the workspace, or git. Use **Buddy: Remove API Key** to delete one.
 
 Supported providers:
 
@@ -53,10 +53,13 @@ Supported providers:
 | OpenAI | Default. Set `buddy.model` or pick from the command. |
 | Anthropic | Claude models via the Anthropic API. |
 | OpenRouter | OpenAI-compatible gateway; models like `openai/gpt-4o`, `anthropic/claude-3.5-sonnet`. |
+| OpenCode Zen (`opencode`) | Curated coding models via `opencode.ai/zen` (OpenAI-compatible `chat/completions` endpoint). Get a key at `opencode.ai/zen`, then **Buddy: Set API Key** → `opencode`. The model list is **fetched live from the Zen API** — nothing hardcoded. **FREE**-badged models work without paying (paid ones are listed below, billed by opencode). Optional override via `buddy.opencodeBaseUrl`. |
 | Ollama | Local models; no API key. Default URL `http://localhost:11434`. |
 | Custom | Any OpenAI-compatible endpoint. Set `buddy.baseUrl` and `buddy.model`. |
 
 For a self-hosted or proxy API, use **Buddy: Configure API Endpoint (URL + Key)** instead.
+
+> **Heads-up on OpenCode Zen:** every model in that list is provided and billed by **opencode.ai** — Buddy only forwards your locally stored key and requests. Buddy shows a popup about this, plus a warning on FREE models: free/stealth models may use your prompts and completions to improve or train models, so don't send secrets. Paid models follow their underlying provider retention (e.g. OpenAI/Anthropic ~30 days). Details: `opencode.ai/docs/zen`.
 
 ## Using Buddy
 
@@ -108,7 +111,7 @@ It uses your active editor, selection, `@` file references, and diagnostics as c
 Common settings (Settings → search `buddy`):
 
 ```
-buddy.provider          openai | anthropic | openrouter | ollama | custom
+buddy.provider          openai | anthropic | openrouter | opencode | ollama | custom
 buddy.model             Model ID (provider-specific)
 buddy.maxIterations     Tool loop limit per request (default 25)
 buddy.autoApproveReadOnly   Auto-run read-only tools (default true)
@@ -118,7 +121,21 @@ buddy.maxMemoryTurns    History kept per workspace (default 20)
 
 Web search (`buddy.webSearch.*`) is on by default. Provider `auto` uses Serper, Brave, Tavily, or Google when keys exist; otherwise DuckDuckGo. Optional keys via **Buddy: Set Web Search API Key**.
 
-Provider-specific base URLs: `buddy.openaiBaseUrl`, `buddy.anthropicBaseUrl`, `buddy.openrouterBaseUrl`, `buddy.baseUrl` (custom), `buddy.ollamaBaseUrl`.
+Provider-specific base URLs: `buddy.openaiBaseUrl`, `buddy.anthropicBaseUrl`, `buddy.openrouterBaseUrl`, `buddy.opencodeBaseUrl`, `buddy.baseUrl` (custom), `buddy.ollamaBaseUrl`.
+
+API keys are never stored in settings or the workspace — only in VS Code SecretStorage on your machine.
+
+## Using this repo with opencode
+
+This repo ships with `opencode.json` + `AGENTS.md` so you can work on Buddy itself with [opencode](https://opencode.ai):
+
+```bash
+cd Buddy
+opencode          # then /connect → pick a provider (e.g. OpenCode Zen) and paste your key
+/init             # only if you want opencode to regenerate AGENTS.md
+```
+
+Auth is local-only: `/connect` writes to `~/.local/share/opencode/auth.json` (outside the repo, never committed). `opencode.json` in this repo contains no secrets — only model, permissions (`edit`/`bash` ask), formatter/LSP, and `instructions: ["AGENTS.md"]`. Custom slash commands live in `.opencode/commands/` and mirror Buddy's `/plan`, `/think`, `/debug`, `/swarm`, `/subagent`.
 
 ## Commands
 
@@ -126,7 +143,8 @@ Provider-specific base URLs: `buddy.openaiBaseUrl`, `buddy.anthropicBaseUrl`, `b
 |---------|--|
 | **Buddy: Select Provider and Model** | Change provider and model |
 | **Buddy: Select Model** | Change model for the current provider |
-| **Buddy: Set API Key** | Store a provider API key |
+| **Buddy: Set API Key** | Store a provider API key (local SecretStorage only) |
+| **Buddy: Remove API Key (local only)** | Delete a stored provider API key |
 | **Buddy: Configure API Endpoint (URL + Key)** | Custom OpenAI-compatible API |
 | **Buddy: Open Panel** | Open the sidebar chat |
 | **Buddy: Switch UI (Chat / Panel / Both)** | Change where Buddy appears |

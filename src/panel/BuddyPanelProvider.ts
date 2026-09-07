@@ -8,7 +8,17 @@ import {
   type WebviewOutboundMessage,
 } from '../chat/streamAdapters';
 import { applyModelSelection, applyProviderSelection } from '../llm/applyProviderModel';
-import { getPanelLlmConfig } from '../llm/panelProviderSettings';
+import {
+  getConfiguredProviderId,
+} from '../llm/providerConfig';
+import {
+  getPanelLlmConfig,
+  getPanelLlmConfigWithLiveModels,
+} from '../llm/panelProviderSettings';
+import {
+  maybeShowOpencodeFreeModelNotice,
+  maybeShowOpencodeProviderNotice,
+} from '../llm/opencodeNotices';
 import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
 import type { ProviderId } from '../llm/router';
 
@@ -71,10 +81,16 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           break;
         case 'setProvider':
           await applyProviderSelection(this.context, raw.providerId as ProviderId);
+          if (raw.providerId === 'opencode') {
+            await maybeShowOpencodeProviderNotice(this.context);
+          }
           this.pushLlmConfig();
           break;
         case 'setModel':
           await applyModelSelection(raw.model);
+          if (getConfiguredProviderId() === 'opencode') {
+            await maybeShowOpencodeFreeModelNotice(this.context, raw.model);
+          }
           this.pushLlmConfig();
           break;
         case 'pickProviderModel':
@@ -98,7 +114,13 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private pushLlmConfig(): void {
-    this.post({ type: 'llmConfig', config: getPanelLlmConfig() });
+    const sync = getPanelLlmConfig();
+    this.post({ type: 'llmConfig', config: sync });
+    if (sync.modelsLoading) {
+      void getPanelLlmConfigWithLiveModels(this.context).then((full) => {
+        this.post({ type: 'llmConfig', config: full });
+      });
+    }
   }
 
   private async handleClear(): Promise<void> {

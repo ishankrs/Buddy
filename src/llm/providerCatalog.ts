@@ -9,6 +9,11 @@ export interface ProviderDefinition {
   modelSuggestions: string[];
   baseUrlSettingKey?: string;
   defaultBaseUrl?: string;
+  /**
+   * When true, the model picker fetches the live list from the provider API
+   * at selection time instead of using `modelSuggestions` (which stays empty).
+   */
+  dynamicModels?: boolean;
 }
 
 export const PROVIDERS: ProviderDefinition[] = [
@@ -59,6 +64,19 @@ export const PROVIDERS: ProviderDefinition[] = [
     modelSuggestions: ['llama3.1', 'qwen2.5-coder', 'codellama', 'mistral'],
     baseUrlSettingKey: 'ollamaBaseUrl',
     defaultBaseUrl: 'http://localhost:11434',
+  },
+  {
+    id: 'opencode',
+    label: 'OpenCode Zen',
+    description: 'Curated coding models via opencode.ai/zen (OpenAI-compatible)',
+    requiresApiKey: true,
+    // Offline fallback only: the picker always fetches the live catalog from
+    // https://opencode.ai/zen/v1/models (free models first with a FREE badge).
+    defaultModel: 'kimi-k2.5',
+    modelSuggestions: [],
+    baseUrlSettingKey: 'opencodeBaseUrl',
+    defaultBaseUrl: 'https://opencode.ai/zen/v1/chat/completions',
+    dynamicModels: true,
   },
   {
     id: 'custom',

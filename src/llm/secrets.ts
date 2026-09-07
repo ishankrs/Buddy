@@ -2,6 +2,11 @@ import * as vscode from 'vscode';
 
 const SECRET_PREFIX = 'buddy.apiKey.';
 
+// API keys are stored ONLY in VS Code SecretStorage (OS keychain) on this
+// machine. They are never written to settings files, opencode.json,
+// AGENTS.md, or the workspace. Use "Buddy: Set API Key" to store one,
+// and "Buddy: Remove API Key" (or re-set with an empty value) to delete it.
+
 export async function getApiKey(
   context: vscode.ExtensionContext,
   provider: string
@@ -22,8 +27,8 @@ export async function promptForApiKey(
   provider: string
 ): Promise<string | undefined> {
   const key = await vscode.window.showInputBox({
-    title: `Buddy: Set ${provider} API Key`,
-    prompt: `Enter your ${provider} API key`,
+    title: `Buddy: Set ${provider} API Key (stored locally only)`,
+    prompt: `Enter your ${provider} API key. It is stored only in this machine's VS Code SecretStorage (OS keychain) — never in settings or the workspace.`,
     password: true,
     ignoreFocusOut: true,
   });
@@ -110,9 +115,18 @@ export async function ensureApiKey(
     key = await promptForApiKey(context, provider);
   }
   if (!key) {
-    throw new Error(
-      `No API key configured for ${provider}. Run "Buddy: Set API Key" or "Buddy: Configure API Endpoint (URL + Key)" from the Command Palette.`
-    );
+    const hint =
+      provider === 'opencode'
+        ? 'Get a key at https://opencode.ai/zen, then run "Buddy: Set API Key" and pick opencode. The key is stored locally only (VS Code SecretStorage).'
+        : `No API key configured for ${provider}. Run "Buddy: Set API Key" or "Buddy: Configure API Endpoint (URL + Key)" from the Command Palette. Keys are stored locally only (VS Code SecretStorage).`;
+    throw new Error(hint);
   }
   return key;
+}
+
+export async function removeApiKey(
+  context: vscode.ExtensionContext,
+  provider: string
+): Promise<void> {
+  await context.secrets.delete(`${SECRET_PREFIX}${provider}`);
 }

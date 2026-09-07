@@ -68,15 +68,38 @@
 
   function fillSelect(selectEl, options, selectedValue) {
     selectEl.innerHTML = '';
+    let currentGroup = null;
+    let groupEl = null;
     for (const option of options) {
       const el = document.createElement('option');
       el.value = option.value;
       el.textContent = option.label;
+      if (option.disabled) {
+        el.disabled = true;
+      }
       if (option.value === selectedValue) {
         el.selected = true;
       }
-      selectEl.appendChild(el);
+      if (option.group) {
+        if (option.group !== currentGroup) {
+          currentGroup = option.group;
+          groupEl = document.createElement('optgroup');
+          groupEl.label = option.group;
+          selectEl.appendChild(groupEl);
+        }
+        groupEl.appendChild(el);
+      } else {
+        currentGroup = null;
+        groupEl = null;
+        selectEl.appendChild(el);
+      }
     }
+  }
+
+  function toModelOptions(models) {
+    return models.map((model) =>
+      typeof model === 'string' ? { value: model, label: model } : model
+    );
   }
 
   function applyLlmConfig(config) {
@@ -88,8 +111,17 @@
       config.providerId
     );
 
-    const modelOptions = config.models.map((model) => ({ value: model, label: model }));
+    const modelOptions = toModelOptions(config.models || []);
+    if (config.modelsLoading) {
+      if (!modelOptions.some((o) => o.value === config.model)) {
+        modelOptions.unshift({ value: config.model, label: config.model });
+      }
+      modelOptions.unshift({ value: '', label: 'Loading live models…', disabled: true });
+    }
     modelOptions.push({ value: '__pick__', label: 'Choose model…' });
+    if (config.modelsError) {
+      modelOptions.push({ value: '', label: '⚠ ' + config.modelsError, disabled: true });
+    }
     fillSelect(modelEl, modelOptions, config.model);
 
     providerSummaryEl.textContent = config.summary;

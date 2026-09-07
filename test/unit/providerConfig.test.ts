@@ -13,7 +13,16 @@ describe('PROVIDERS', () => {
   it('lists all supported provider ids', () => {
     assert.deepEqual(
       PROVIDERS.map((p) => p.id).sort(),
-      ['anthropic', 'custom', 'ollama', 'openai', 'openrouter'].sort()
+      ['anthropic', 'custom', 'ollama', 'openai', 'opencode', 'openrouter'].sort()
     );
+  });
+
+  it('includes opencode (Zen) with dynamic (fetched, not hardcoded) models', () => {
+    const opencode = PROVIDERS.find((p) => p.id === 'opencode');
+    assert.ok(opencode);
+    assert.equal(opencode?.defaultBaseUrl, 'https://opencode.ai/zen/v1/chat/completions');
+    assert.equal(opencode?.baseUrlSettingKey, 'opencodeBaseUrl');
+    assert.ok(opencode?.dynamicModels);
+    assert.deepEqual(opencode?.modelSuggestions, []);
   });
 });

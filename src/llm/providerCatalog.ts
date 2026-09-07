@@ -67,15 +67,13 @@ export const PROVIDERS: ProviderDefinition[] = [
   },
   {
     id: 'opencode',
-    label: 'OpenCode Zen',
-    description: 'Curated coding models via opencode.ai/zen (OpenAI-compatible)',
-    requiresApiKey: true,
-    // Offline fallback only: the picker always fetches the live catalog from
-    // https://opencode.ai/zen/v1/models (free models first with a FREE badge).
-    defaultModel: 'kimi-k2.5',
+    label: 'OpenCode (Local)',
+    description: 'Uses your locally installed OpenCode CLI. Authentication and provider configuration are managed by OpenCode.',
+    requiresApiKey: false,
+    // No Buddy-side default: the local OpenCode session's configured model
+    // is used unless buddy.model is set.
+    defaultModel: '',
     modelSuggestions: [],
-    baseUrlSettingKey: 'opencodeBaseUrl',
-    defaultBaseUrl: 'https://opencode.ai/zen/v1/chat/completions',
     dynamicModels: true,
   },
   {

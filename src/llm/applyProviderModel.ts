@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getProviderDefinition } from './providerCatalog';
 import { getConfiguredModel } from './providerConfig';
 import type { ProviderId } from './router';
-import { maybeShowOpencodeProviderNotice } from './opencodeNotices';
+import { ensureOpencodeAvailable } from './opencode/vscode';
 import { ensureApiKey, getApiKey, promptForApiKey } from './secrets';
 
 export async function applyProviderSelection(
@@ -13,6 +13,15 @@ export async function applyProviderSelection(
   const def = getProviderDefinition(providerId);
   const previousProvider = config.get<ProviderId>('provider', 'openai');
   const previousModel = getConfiguredModel();
+
+  if (providerId === 'opencode') {
+    // Local backend: no API key. Verify the CLI exists BEFORE switching so
+    // a missing installation never leaves the provider in a broken state.
+    const detection = await ensureOpencodeAvailable(context);
+    if (!detection.ok) {
+      return false;
+    }
+  }
 
   await config.update('provider', providerId, vscode.ConfigurationTarget.Global);
 
@@ -33,10 +42,6 @@ export async function applyProviderSelection(
         return false;
       }
     }
-  }
-
-  if (providerId === 'opencode') {
-    await maybeShowOpencodeProviderNotice(context);
   }
 
   return true;

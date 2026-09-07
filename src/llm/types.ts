@@ -50,7 +50,17 @@ export interface StreamDoneChunk {
   toolCalls?: Array<{ id: string; name: string; arguments: string }>;
 }
 
-export type StreamChunk = StreamTextChunk | StreamToolCallChunk | StreamDoneChunk;
+/**
+ * Non-answer activity (e.g. a local agent backend running tools). Rendered
+ * as progress, never as answer text. Only emitted by providers that execute
+ * tools themselves (OpenCode local backend).
+ */
+export interface StreamActivityChunk {
+  type: 'activity';
+  text: string;
+}
+
+export type StreamChunk = StreamTextChunk | StreamToolCallChunk | StreamDoneChunk | StreamActivityChunk;
 
 export interface LLMProvider {
   id: string;

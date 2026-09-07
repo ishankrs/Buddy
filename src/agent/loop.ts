@@ -66,7 +66,7 @@ async function runAgentLoopInner(
     });
   }
 
-  const provider = await getProvider(context);
+  const provider = await getProvider(context, { planMode: options.planMode });
   const toolOptions = { includeSpawnSubagent: allowSpawn };
   const tools = getToolSchemas(toolOptions);
   const messages: Message[] = [
@@ -307,6 +307,8 @@ async function collectTurn(
         if (thinkSplitter) {
           thinkSplitter.feed(chunk.text, stream);
         }
+      } else if (chunk.type === 'activity') {
+        stream.progress(chunk.text);
       } else if (chunk.type === 'tool_call') {
         toolCallMap.set(chunk.id, {
           id: chunk.id,

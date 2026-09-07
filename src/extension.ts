@@ -6,6 +6,12 @@ import {
 import { configureCustomEndpoint, promptForApiKey, promptForBaseUrl, removeApiKey } from './llm/secrets';
 import { selectModelOnly, selectProviderAndModel } from './llm/selectProviderModel';
 import { PROVIDERS } from './llm/providerCatalog';
+import { getSharedManager, resetSharedManager } from './llm/opencode/manager';
+import {
+  ensureOpencodeAvailable,
+  nodeManagerDeps,
+  openOpencodeDocs,
+} from './llm/opencode/vscode';
 import { registerProviderStatusBar } from './llm/statusBar';
 import { registerVsCodeTools } from './tools/registry';
 import { setWebToolsContext } from './tools/webTools';
@@ -17,6 +23,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerProviderCommands(context);
   registerUiCommands(context);
   registerCoreCommands(context);
+  registerOpencodeCommands(context);
   registerProviderStatusBar(context);
 
   setWebToolsContext(context);
@@ -157,9 +164,7 @@ function registerCoreCommands(context: vscode.ExtensionContext): void {
             ? 'anthropicBaseUrl'
             : selected === 'openrouter'
               ? 'openrouterBaseUrl'
-              : selected === 'opencode'
-                ? 'opencodeBaseUrl'
-                : undefined;
+              : undefined;
 
       if (baseUrlKey) {
         const setUrl = await vscode.window.showInformationMessage(
@@ -200,8 +205,25 @@ function registerCoreCommands(context: vscode.ExtensionContext): void {
   );
 }
 
-function registerUiCommands(context: vscode.ExtensionContext): void {
+function registerOpencodeCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
+    vscode.commands.registerCommand('buddy.checkOpencode', async () => {
+      const detection = await ensureOpencodeAvailable(context);
+      if (!detection.ok) {
+        return;
+      }
+      const choice = await vscode.window.showInformationMessage(
+        `✓ OpenCode detected${detection.version ? ` (v${detection.version})` : ''} at ${detection.path}. Uses your locally installed OpenCode CLI. Authentication and provider configuration are managed by OpenCode — Buddy never asks for or stores OpenCode credentials.`,
+        'Open Install Docs'
+      );
+      if (choice === 'Open Install Docs') {
+        openOpencodeDocs();
+      }
+    })
+  );
+}
+
+function registerUiCommands(context: vscode.ExtensionContext): void {  context.subscriptions.push(
     vscode.commands.registerCommand('buddy.switchUi', async () => {
       const current = getUiMode();
       const picked = await vscode.window.showQuickPick(
@@ -273,5 +295,13 @@ function maybeShowUiHint(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  // no-op
+  // Cleanly terminate the local OpenCode child process if Buddy started it.
+  try {
+    const manager = getSharedManager();
+    void manager.dispose().catch(() => undefined);
+  } catch {
+    // Never started — nothing to stop.
+  } finally {
+    resetSharedManager();
+  }
 }

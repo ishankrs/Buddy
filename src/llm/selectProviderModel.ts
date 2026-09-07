@@ -3,17 +3,17 @@ import {
   formatProviderModelSummary,
   getConfiguredModel,
   getConfiguredProviderId,
-  getProviderBaseUrl,
   getProviderDefinition,
   PROVIDERS,
   type ProviderDefinition,
 } from './providerConfig';
 import type { ProviderId } from './router';
-import { fetchOpencodeModels, groupOpencodeModels } from './opencodeModels';
+import { getSharedManager } from './opencode/manager';
 import {
-  maybeShowOpencodeFreeModelNotice,
-  maybeShowOpencodeProviderNotice,
-} from './opencodeNotices';
+  ensureOpencodeAvailable,
+  getWorkspacePath,
+  nodeManagerDeps,
+} from './opencode/vscode';
 import { ensureApiKey, getApiKey, promptForApiKey, promptForBaseUrl } from './secrets';
 
 async function pickProvider(current: ProviderId): Promise<ProviderId | undefined> {
@@ -55,7 +55,7 @@ async function pickModel(
   currentModel: string
 ): Promise<string | undefined> {
   if (provider.id === 'opencode') {
-    return pickOpencodeModel(context, currentModel);
+    return pickOpencodeLocalModel(context, currentModel);
   }
 
   const items = [
@@ -89,101 +89,99 @@ async function pickModel(
 }
 
 /**
- * Live OpenCode Zen picker: fetches the current catalog from the API (never
- * hardcoded), lists FREE models first with a FREE badge, then paid models.
+ * OpenCode (Local) picker: models come from the user's own OpenCode
+ * installation via ACP — never hardcoded, no free/paid assumptions.
+ * Selecting a model applies it to the local session AND saves buddy.model.
  */
-async function pickOpencodeModel(
+async function pickOpencodeLocalModel(
   context: vscode.ExtensionContext,
   currentModel: string
 ): Promise<string | undefined> {
+  const detection = await ensureOpencodeAvailable(context);
+  if (!detection.ok) {
+    return undefined;
+  }
+  const manager = getSharedManager(nodeManagerDeps(context));
+  const workspacePath = getWorkspacePath();
   const current = currentModel.trim();
-  let ids: string[];
+
+  let listed: { current: string; options: Array<{ value: string; name: string; description?: string }> };
   try {
-    const models = await vscode.window.withProgress(
+    listed = await vscode.window.withProgress(
       {
         location: vscode.ProgressLocation.Notification,
-        title: 'Buddy: Fetching OpenCode Zen models…',
+        title: 'Buddy: Reading models from local OpenCode…',
       },
-      async () =>
-        fetchOpencodeModels({
-          apiKey: await getApiKey(context, 'opencode'),
-          baseUrl: getProviderBaseUrl('opencode'),
-        })
+      () => manager.getModelOptions(workspacePath)
     );
-    ids = models.map((m) => m.id);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const choice = await vscode.window.showWarningMessage(
-      `Buddy: Could not fetch the live OpenCode Zen model list. ${message}`,
+      `Buddy: Could not read models from local OpenCode. ${message}`,
       'Retry',
       'Enter manually'
     );
     if (choice === 'Retry') {
-      return pickOpencodeModel(context, currentModel);
+      return pickOpencodeLocalModel(context, currentModel);
     }
     if (choice === 'Enter manually') {
-      return promptCustomModel('OpenCode Zen', current || 'kimi-k2.5');
+      const manual = await promptCustomModel('OpenCode (Local)', current);
+      return manual ? applyOpencodeModel(context, workspacePath, manual) : undefined;
     }
     return undefined;
   }
 
-  if (current && !ids.includes(current)) {
-    ids = [current, ...ids];
-  }
-
-  const { free, paid } = groupOpencodeModels(ids);
+  const effectiveCurrent = current || listed.current;
   type Item = vscode.QuickPickItem & { model: string };
-  const items: Array<Item | vscode.QuickPickItem> = [
-    {
-      label: 'FREE — works without paying',
-      kind: vscode.QuickPickItemKind.Separator,
-    },
-    ...free.map((m): Item => ({
-      label: m.id,
-      description: '$(badge) FREE',
+  const items: Item[] = [
+    ...listed.options.map((m): Item => ({
+      label: m.name || m.value,
+      description: m.name && m.name !== m.value ? m.value : undefined,
       detail:
-        m.id === current
-          ? 'Current model · no charge · free/stealth models may use prompts to improve models'
-          : 'No charge · free/stealth models may use prompts to improve models',
-      picked: m.id === current,
-      model: m.id,
-    })),
-    {
-      label: 'Paid — billed by opencode.ai',
-      kind: vscode.QuickPickItemKind.Separator,
-    },
-    ...paid.map((m): Item => ({
-      label: m.id,
-      description: 'Paid',
-      detail:
-        m.id === current
-          ? 'Current model · billed by opencode.ai'
-          : 'Billed by opencode.ai',
-      picked: m.id === current,
-      model: m.id,
+        m.value === effectiveCurrent
+          ? current
+            ? 'Current model'
+            : 'Current model (OpenCode default)'
+          : (m.description ?? ''),
+      picked: m.value === effectiveCurrent,
+      model: m.value,
     })),
     {
       label: '$(edit) Enter custom model…',
-      description: 'Type any model ID from opencode.ai/docs/zen',
-      detail: '',
+      description: 'Type any model ID configured in your OpenCode',
       model: '',
     },
   ];
 
   const picked = await vscode.window.showQuickPick(items, {
-    title: 'Buddy: Select Model (OpenCode Zen, live list)',
-    placeHolder: current || 'Pick a model — FREE ones need no payment',
+    title: `Buddy: Select Model (OpenCode Local${detection.version ? ` v${detection.version}` : ''})`,
+    placeHolder: 'Models are provided by your local OpenCode installation',
   });
 
-  if (!picked || !('model' in picked)) {
+  if (!picked) {
     return undefined;
   }
-
-  if (picked.model) {
-    return picked.model;
+  if (!picked.model) {
+    const manual = await promptCustomModel('OpenCode (Local)', current);
+    return manual ? applyOpencodeModel(context, workspacePath, manual) : undefined;
   }
+  return applyOpencodeModel(context, workspacePath, picked.model);
+}
 
-  return promptCustomModel('OpenCode Zen', current);
+/** Apply a model to the local OpenCode session; undefined on failure. */
+async function applyOpencodeModel(
+  context: vscode.ExtensionContext,
+  workspacePath: string,
+  value: string
+): Promise<string | undefined> {
+  try {
+    await getSharedManager(nodeManagerDeps(context)).setModel(workspacePath, value);
+    return value;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    void vscode.window.showWarningMessage(`Buddy: Could not set OpenCode model. ${message}`);
+    return undefined;
+  }
 }
 
 async function ensureProviderReady(
@@ -254,12 +252,17 @@ export async function selectProviderAndModel(context: vscode.ExtensionContext): 
   }
 
   if (provider.id === 'opencode') {
-    await maybeShowOpencodeProviderNotice(context);
+    // Local backend: verify the CLI exists (shows install guidance when not).
+    // No API keys involved.
+    const detection = await ensureOpencodeAvailable(context);
+    if (!detection.ok) {
+      return;
+    }
   }
 
   const model =
     (await pickModel(context, provider, providerId === currentProvider ? currentModel : '')) ??
-    (provider.id === 'custom' ? undefined : provider.defaultModel);
+    (provider.id === 'custom' ? undefined : provider.defaultModel || undefined);
 
   if (provider.id === 'custom' && !model) {
     vscode.window.showWarningMessage('Custom provider requires a model name.');
@@ -269,9 +272,6 @@ export async function selectProviderAndModel(context: vscode.ExtensionContext): 
   await config.update('provider', providerId, vscode.ConfigurationTarget.Global);
   if (model) {
     await config.update('model', model, vscode.ConfigurationTarget.Global);
-    if (providerId === 'opencode') {
-      await maybeShowOpencodeFreeModelNotice(context, model);
-    }
   }
 
   const summary = model
@@ -301,10 +301,6 @@ export async function selectModelOnly(context: vscode.ExtensionContext): Promise
   await vscode.workspace
     .getConfiguration('buddy')
     .update('model', model, vscode.ConfigurationTarget.Global);
-
-  if (providerId === 'opencode') {
-    await maybeShowOpencodeFreeModelNotice(context, model);
-  }
 
   vscode.window.showInformationMessage(`Buddy: Model set to ${model} (${provider.label})`);
 }

@@ -1,7 +1,7 @@
 {
   "name": "buddy-ai-coding-agent",
   "displayName": "Buddy AI Coding Agent",
-  "description": "AI coding agent for VS Code — chat with @buddy, edit files, run terminal, search the web. Multi-provider LLM (OpenAI, Anthropic, OpenRouter, Ollama).",
+  "description": "AI coding agent for VS Code — chat with @buddy, edit files, run terminal, search the web. Multi-provider LLM (OpenAI, Anthropic, OpenRouter, Ollama, local OpenCode CLI).",
   "version": "0.2.1",
   "publisher": "ishankrs",
   "license": "MIT",
@@ -39,6 +39,7 @@
     "onCommand:buddy.selectModel",
     "onCommand:buddy.setApiKey",
     "onCommand:buddy.removeApiKey",
+    "onCommand:buddy.checkOpencode",
     "onCommand:buddy.configureEndpoint",
     "onCommand:buddy.openPanel"
   ],
@@ -143,6 +144,12 @@
         "icon": "$(symbol-misc)"
       },
       {
+        "command": "buddy.checkOpencode",
+        "title": "Check OpenCode (Local)",
+        "category": "Buddy",
+        "icon": "$(terminal)"
+      },
+      {
         "command": "buddy.openLlmSettings",
         "title": "Open LLM Settings",
         "category": "Buddy",
@@ -156,6 +163,7 @@
         { "command": "buddy.openLlmSettings" },
         { "command": "buddy.setApiKey" },
         { "command": "buddy.removeApiKey" },
+        { "command": "buddy.checkOpencode" },
         { "command": "buddy.configureEndpoint" },
         { "command": "buddy.openPanel" },
         { "command": "buddy.switchUi" },
@@ -194,7 +202,7 @@
             "custom"
           ],
           "default": "openai",
-          "description": "LLM provider to use. Use 'openrouter' for OpenRouter, 'opencode' for OpenCode Zen (opencode.ai/zen), or 'custom' for any OpenAI-compatible API with buddy.baseUrl."
+          "description": "LLM provider to use. Use 'openrouter' for OpenRouter, 'opencode' for a locally installed OpenCode CLI (no API key in Buddy), or 'custom' for any OpenAI-compatible API with buddy.baseUrl."
         },
         "buddy.baseUrl": {
           "type": "string",
@@ -216,15 +224,15 @@
           "default": "https://openrouter.ai/api/v1",
           "description": "OpenRouter API base URL (OpenAI-compatible). Get a key at openrouter.ai/keys"
         },
-        "buddy.opencodeBaseUrl": {
+        "buddy.opencodeBinary": {
           "type": "string",
-          "default": "https://opencode.ai/zen/v1/chat/completions",
-          "description": "OpenCode Zen API base URL (OpenAI-compatible chat/completions endpoint). Get a key at opencode.ai/zen. Only chat/completions models work here (e.g. kimi-k2.5, deepseek-v4-pro, glm-5.3)."
+          "default": "",
+          "description": "Optional explicit path to the OpenCode CLI binary (e.g. /Users/you/.opencode/bin/opencode). Leave empty to resolve 'opencode' from PATH and usual install locations."
         },
         "buddy.model": {
           "type": "string",
           "default": "",
-          "description": "Model name (leave empty for provider default). OpenRouter uses IDs like openai/gpt-4o."
+          "description": "Model name (leave empty for provider default). OpenRouter uses IDs like openai/gpt-4o. For OpenCode (Local), use the full OpenCode model value like opencode/big-pickle, or leave empty for your OpenCode default."
         },
         "buddy.maxIterations": {
           "type": "number",

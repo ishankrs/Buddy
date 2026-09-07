@@ -4,11 +4,11 @@ import {
   formatProviderModelSummary,
   getConfiguredModel,
   getConfiguredProviderId,
-  getProviderBaseUrl,
   getProviderDefinition,
 } from './providerConfig';
-import { fetchOpencodeModels } from './opencodeModels';
-import { getApiKey } from './secrets';
+import { getSharedManager } from './opencode/manager';
+import { OpenCodeError } from './opencode/acp';
+import { getWorkspacePath, nodeManagerDeps } from './opencode/vscode';
 import type { ProviderId } from './router';
 
 export interface PanelModelOption {
@@ -28,9 +28,6 @@ export interface PanelLlmConfig {
   modelsLoading: boolean;
   modelsError?: string;
 }
-
-export const OPENCODE_FREE_GROUP = 'FREE — works without paying';
-export const OPENCODE_PAID_GROUP = 'Paid — billed by opencode.ai';
 
 function baseConfig(): Omit<PanelLlmConfig, 'models' | 'modelsLoading' | 'modelsError'> {
   const providerId = getConfiguredProviderId();
@@ -54,10 +51,9 @@ export function getPanelLlmConfig(): PanelLlmConfig {
   const def = getProviderDefinition(providerId);
 
   if (providerId === 'opencode') {
-    const fallback = base.model || def.defaultModel;
     return {
       ...base,
-      models: fallback ? [{ value: fallback, label: fallback }] : [],
+      models: base.model ? [{ value: base.model, label: base.model }] : [],
       modelsLoading: true,
     };
   }
@@ -75,9 +71,9 @@ export function getPanelLlmConfig(): PanelLlmConfig {
 }
 
 /**
- * Full config with the live Zen catalog for the opencode provider
- * (FREE group first with badges, paid group below). Falls back to the
- * configured model with `modelsError` when the fetch fails.
+ * Full config with models from the local OpenCode installation (flat list,
+ * exactly as OpenCode advertises them). Falls back to the configured model
+ * with `modelsError` when OpenCode is missing or unreachable.
  */
 export async function getPanelLlmConfigWithLiveModels(
   context: vscode.ExtensionContext
@@ -89,27 +85,33 @@ export async function getPanelLlmConfigWithLiveModels(
   }
 
   try {
-    const live = await fetchOpencodeModels({
-      apiKey: await getApiKey(context, 'opencode'),
-      baseUrl: getProviderBaseUrl('opencode'),
-    });
-    const options: PanelModelOption[] = live.map((m) => ({
-      value: m.id,
-      label: m.free ? `${m.id} · FREE` : m.id,
-      group: m.free ? OPENCODE_FREE_GROUP : OPENCODE_PAID_GROUP,
+    const manager = getSharedManager(nodeManagerDeps(context));
+    const listed = await manager.getModelOptions(getWorkspacePath());
+    const effectiveCurrent = base.model || listed.current;
+    const options: PanelModelOption[] = listed.options.map((m) => ({
+      value: m.value,
+      label: m.name && m.name !== m.value ? `${m.name} (${m.value})` : m.value,
     }));
-    if (base.model && !options.some((o) => o.value === base.model)) {
-      options.unshift({ value: base.model, label: base.model, group: 'Current' });
+    if (effectiveCurrent && !options.some((o) => o.value === effectiveCurrent)) {
+      options.unshift({
+        value: effectiveCurrent,
+        label: effectiveCurrent,
+        group: 'Current',
+      });
     }
-    return { ...base, models: options, modelsLoading: false };
+    return { ...base, model: effectiveCurrent, models: options, modelsLoading: false };
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const fallback = base.model || getProviderDefinition('opencode').defaultModel;
+    const message =
+      err instanceof OpenCodeError && err.kind === 'not-installed'
+        ? 'OpenCode CLI not detected — run Buddy: Check OpenCode'
+        : err instanceof Error
+          ? err.message
+          : String(err);
     return {
       ...base,
-      models: fallback ? [{ value: fallback, label: fallback }] : [],
+      models: base.model ? [{ value: base.model, label: base.model }] : [],
       modelsLoading: false,
-      modelsError: `Live model list unavailable (${message}). Use ⋯ to retry.`,
+      modelsError: `OpenCode models unavailable (${message})`,
     };
   }
 }

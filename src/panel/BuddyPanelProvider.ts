@@ -15,10 +15,8 @@ import {
   getPanelLlmConfig,
   getPanelLlmConfigWithLiveModels,
 } from '../llm/panelProviderSettings';
-import {
-  maybeShowOpencodeFreeModelNotice,
-  maybeShowOpencodeProviderNotice,
-} from '../llm/opencodeNotices';
+import { getSharedManager } from '../llm/opencode/manager';
+import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
 import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
 import type { ProviderId } from '../llm/router';
 
@@ -81,15 +79,23 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           break;
         case 'setProvider':
           await applyProviderSelection(this.context, raw.providerId as ProviderId);
-          if (raw.providerId === 'opencode') {
-            await maybeShowOpencodeProviderNotice(this.context);
-          }
           this.pushLlmConfig();
           break;
         case 'setModel':
           await applyModelSelection(raw.model);
           if (getConfiguredProviderId() === 'opencode') {
-            await maybeShowOpencodeFreeModelNotice(this.context, raw.model);
+            // Keep the local session on the picked model (best effort).
+            try {
+              await getSharedManager(nodeManagerDeps(this.context)).setModel(
+                getWorkspacePath(),
+                raw.model
+              );
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              void vscode.window.showWarningMessage(
+                `Buddy: Could not set OpenCode model. ${message}`
+              );
+            }
           }
           this.pushLlmConfig();
           break;
@@ -126,6 +132,12 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   private async handleClear(): Promise<void> {
     this.cancelRun();
     await this.memory.clear();
+    // Fresh OpenCode session next time (Buddy ↔ OpenCode session mapping).
+    try {
+      await getSharedManager(nodeManagerDeps(this.context)).resetSession(getWorkspacePath());
+    } catch {
+      // Best effort: memory is cleared regardless.
+    }
     this.post({ type: 'cleared' });
   }
 

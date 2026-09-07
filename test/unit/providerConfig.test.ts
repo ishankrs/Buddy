@@ -17,11 +17,12 @@ describe('PROVIDERS', () => {
     );
   });
 
-  it('includes opencode (Zen) with dynamic (fetched, not hardcoded) models', () => {
+  it('includes opencode as a local backend with no API key and no endpoint', () => {
     const opencode = PROVIDERS.find((p) => p.id === 'opencode');
     assert.ok(opencode);
-    assert.equal(opencode?.defaultBaseUrl, 'https://opencode.ai/zen/v1/chat/completions');
-    assert.equal(opencode?.baseUrlSettingKey, 'opencodeBaseUrl');
+    assert.equal(opencode?.requiresApiKey, false);
+    assert.equal(opencode?.defaultBaseUrl, undefined);
+    assert.equal(opencode?.baseUrlSettingKey, undefined);
     assert.ok(opencode?.dynamicModels);
     assert.deepEqual(opencode?.modelSuggestions, []);
   });

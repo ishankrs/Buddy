@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { runFromChatRequest } from '../agent/runBuddyRequest';
 import { SessionMemory } from '../agent/memory';
+import { getSharedManager } from '../llm/opencode/manager';
+import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
 
 export function createChatParticipant(
   context: vscode.ExtensionContext
@@ -29,6 +31,12 @@ export function registerClearMemoryCommand(
     vscode.commands.registerCommand('buddy.clearMemory', async () => {
       const memory = new SessionMemory(context);
       await memory.clear();
+      // Fresh OpenCode session next time (Buddy ↔ OpenCode session mapping).
+      try {
+        await getSharedManager(nodeManagerDeps(context)).resetSession(getWorkspacePath());
+      } catch {
+        // Best effort: memory is cleared regardless.
+      }
       vscode.window.showInformationMessage('Buddy conversation memory cleared.');
     })
   );

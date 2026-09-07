@@ -115,11 +115,9 @@ export async function ensureApiKey(
     key = await promptForApiKey(context, provider);
   }
   if (!key) {
-    const hint =
-      provider === 'opencode'
-        ? 'Get a key at https://opencode.ai/zen, then run "Buddy: Set API Key" and pick opencode. The key is stored locally only (VS Code SecretStorage).'
-        : `No API key configured for ${provider}. Run "Buddy: Set API Key" or "Buddy: Configure API Endpoint (URL + Key)" from the Command Palette. Keys are stored locally only (VS Code SecretStorage).`;
-    throw new Error(hint);
+    throw new Error(
+      `No API key configured for ${provider}. Run "Buddy: Set API Key" or "Buddy: Configure API Endpoint (URL + Key)" from the Command Palette. Keys are stored locally only (VS Code SecretStorage).`
+    );
   }
   return key;
 }

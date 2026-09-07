@@ -43,6 +43,7 @@ flowchart TB
         OpenAI["OpenAI / OpenRouter<br/>(llm/openai.ts)"]
         Anthropic["Anthropic<br/>(llm/anthropic.ts)"]
         Ollama["Ollama<br/>(llm/ollama.ts)"]
+        OCLocal["OpenCode Local<br/>(llm/opencode/* → opencode acp)"]
         Secrets["API keys<br/>(llm/secrets.ts → SecretStorage)"]
     end
 
@@ -82,7 +83,9 @@ flowchart TB
     LlmRouter --> OpenAI
     LlmRouter --> Anthropic
     LlmRouter --> Ollama
+    LlmRouter --> OCLocal
     LlmRouter --> Secrets
+    OCLocal --> OCProc["opencode acp child process<br/>(stdio JSON-RPC)"]
 
     Loop --> Registry
     Registry --> Read
@@ -179,8 +182,9 @@ flowchart TB
     end
 
     subgraph Persist["Persistence"]
-        SS["SecretStorage<br/>API keys"]
+        SS["SecretStorage<br/>API keys (never OpenCode)"]
         WSState["WorkspaceState<br/>conversation memory"]
+        GS["GlobalState<br/>OpenCode session ids"]
     end
 
     Config --> LlmRouter["llm/router.ts"]
@@ -188,6 +192,7 @@ flowchart TB
     Config --> WebTools["tools/webTools.ts"]
     SS --> Secrets["llm/secrets.ts"]
     WSState --> Memory["agent/memory.ts"]
+    GS --> OCMap["Buddy workspace ↔ OpenCode session mapping"]
 ```
 
 ## Layer breakdown
@@ -201,7 +206,7 @@ flowchart TB
 | **Agent loop** | `agent/loop.ts`, `agent/thinkStream.ts`, `agent/runContext.ts` | Multi-turn LLM ↔ tool cycle with streaming |
 | **Context** | `context/gatherer.ts`, `agent/prompts.ts` | Editor/workspace context injected into system prompt |
 | **Memory** | `agent/memory.ts` | Per-workspace turn history + token trimming |
-| **LLM** | `llm/router.ts`, `llm/*Provider*.ts`, `llm/secrets.ts` | Multi-provider abstraction; keys in SecretStorage |
+| **LLM** | `llm/router.ts`, `llm/openai.ts`, `llm/anthropic.ts`, `llm/ollama.ts`, `llm/opencode/*`, `llm/secrets.ts` | Multi-provider abstraction; keys in SecretStorage (never OpenCode); OpenCode runs as a local `opencode acp` child process |
 | **Tools** | `tools/registry.ts`, `readTools`, `writeTools`, `webTools`, `subagentTool` | Eight tools; read-only auto-approve optional |
 | **Safety** | `diff/preview.ts`, approval gates in `writeTools` | Diff before edit; terminal confirmation |
 
@@ -214,6 +219,8 @@ src/
 ├── panel/                # sidebar webview UI
 ├── agent/                # loop, modes, swarm, subagent, memory, prompts
 ├── llm/                  # providers, router, secrets, status bar
+│   └── opencode/         # local OpenCode backend: detector, JSON-RPC,
+│                         # ACP client, process manager, LLM adapter, vscode glue
 ├── tools/                # tool registry + implementations
 ├── context/              # editor/workspace context gathering
 ├── diff/                 # edit preview before apply
@@ -240,11 +247,53 @@ src/
 | `openai` | `llm/openai.ts` | Optional `buddy.openaiBaseUrl` |
 | `anthropic` | `llm/anthropic.ts` | Optional `buddy.anthropicBaseUrl` |
 | `openrouter` | `llm/openai.ts` | OpenAI-compatible; default OpenRouter base URL |
-| `opencode` | `llm/openai.ts` | OpenCode Zen via `buddy.opencodeBaseUrl` (default `https://opencode.ai/zen/v1/chat/completions`); model list fetched live from `https://opencode.ai/zen/v1/models` (`llm/opencodeModels.ts`, 1h cache), FREE badge first, paid below; data notices in `llm/opencodeNotices.ts` |
+| `opencode` | `llm/opencode/*` | Local OpenCode CLI via `opencode acp` (JSON-RPC/stdio). No API key in Buddy; models from the local session (`session/set_config_option`); one OpenCode session per workspace; optional `buddy.opencodeBinary` |
 | `ollama` | `llm/ollama.ts` | Local; no API key |
 | `custom` | `llm/openai.ts` | Any OpenAI-compatible endpoint via `buddy.baseUrl` |
 
-API keys for all providers live only in VS Code SecretStorage (`llm/secrets.ts`); the repo also ships `opencode.json` + `AGENTS.md` + `.opencode/commands/` so opencode CLI/TUI can work on this codebase with local-only auth (`~/.local/share/opencode/auth.json`, never committed).
+API keys for API providers live only in VS Code SecretStorage (`llm/secrets.ts`); OpenCode credentials are never requested, stored, or proxied — auth stays in the user's OpenCode installation. The repo also ships `opencode.json` + `AGENTS.md` + `.opencode/commands/` so opencode CLI/TUI can work on this codebase with local-only auth (`~/.local/share/opencode/auth.json`, never committed).
+
+## OpenCode local backend
+
+Buddy optionally drives a locally installed OpenCode CLI instead of calling
+model APIs directly. One `opencode acp` child process serves the extension
+host; Buddy keeps one OpenCode session per workspace (id persisted in
+globalState, resumed via `session/resume`, closed on conversation clear).
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Buddy as Buddy extension
+    participant OC as opencode acp (local)
+    participant Prov as User's providers
+
+    Buddy->>OC: spawn opencode acp + initialize
+    Buddy->>OC: session/new (per workspace)
+    OC-->>Buddy: sessionId + configOptions (models)
+    User->>Buddy: chat message
+    Buddy->>OC: session/prompt
+    OC->>Prov: model calls (user's OpenCode auth)
+    OC-->>Buddy: session/update (text / thoughts / tool calls)
+    OC->>Buddy: session/request_permission (tool approval)
+    Buddy->>User: VS Code allow/deny picker
+    OC-->>Buddy: session/prompt → stopReason
+    Buddy->>User: streamed answer
+```
+
+Module map (`src/llm/opencode/`):
+
+| Module | Role |
+|--------|------|
+| `detector.ts` | Find `opencode` (PATH → well-known locations → `buddy.opencodeBinary`), verify via `--version` |
+| `rpc.ts` | Newline-delimited JSON-RPC 2.0 peer (requests, notifications, method calls) |
+| `acp.ts` | ACP client: initialize, sessions, prompts, cancel, `set_config_option`, permissions, error classification |
+| `manager.ts` | Singleton process owner, workspace↔session mapping, per-session prompt serialization, clean shutdown |
+| `localProvider.ts` | `LLMProvider` adapter: one ACP turn per Buddy request, text + activity chunks, plan-mode prefix |
+| `vscode.ts` | Only vscode-touching file: spawn/exec wiring, permission QuickPick, detection UX, settings |
+
+Security: no OpenCode API key is requested, stored, logged, or transmitted
+by Buddy; no hosted OpenCode endpoints are called; no traffic is proxied
+through a Buddy server. Permission decisions stay with the user per request.
 
 ## Viewing diagrams
 

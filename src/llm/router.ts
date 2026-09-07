@@ -1,7 +1,11 @@
 import * as vscode from 'vscode';
+import * as os from 'node:os';
 import { createAnthropicProvider } from './anthropic';
 import { createOllamaProvider } from './ollama';
 import { createOpenAIProvider } from './openai';
+import { createOpencodeLocalProvider } from './opencode/localProvider';
+import { getSharedManager } from './opencode/manager';
+import { nodeManagerDeps } from './opencode/vscode';
 import { getProviderBaseUrl, getProviderDefinition, resolveModelForProvider } from './providerConfig';
 import { ensureApiKey } from './secrets';
 import type { LLMProvider } from './types';
@@ -24,7 +28,8 @@ function getRequiredBaseUrl(): string {
 }
 
 export async function getProvider(
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
+  opts?: { planMode?: boolean }
 ): Promise<LLMProvider> {
   const config = vscode.workspace.getConfiguration('buddy');
   const providerId = config.get<ProviderId>('provider', 'openai');
@@ -57,16 +62,15 @@ export async function getProvider(
     case 'ollama':
       return createOllamaProvider(model);
     case 'opencode': {
-      const apiKey = await ensureApiKey(context, 'opencode');
-      const baseURL = getProviderBaseUrl('opencode') ?? 'https://opencode.ai/zen/v1/chat/completions';
-      return createOpenAIProvider(apiKey, model, {
-        baseURL,
-        id: 'opencode',
-        defaultModel: getProviderDefinition('opencode').defaultModel,
-        defaultHeaders: {
-          'HTTP-Referer': 'https://github.com/ishankrs/Buddy',
-          'X-Title': 'Buddy VS Code Extension',
-        },
+      // Local OpenCode CLI backend over ACP (stdio). No API keys: auth and
+      // models are managed by the user's own OpenCode installation.
+      const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+        ?? os.homedir();
+      return createOpencodeLocalProvider({
+        manager: getSharedManager(nodeManagerDeps(context)),
+        workspacePath,
+        model,
+        planMode: opts?.planMode ?? false,
       });
     }
     case 'custom': {

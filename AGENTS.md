@@ -42,6 +42,9 @@ src/
   agent/                # loop, modes, swarm, subagent, memory, prompts
   llm/                  # router, providerCatalog, openai/anthropic/ollama,
                         # secrets (SecretStorage only), statusBar, panel settings
+                        # opencode/ = local OpenCode backend (detector, JSON-RPC,
+                        # ACP client, process manager, LLM adapter, vscode glue)
+                        # — all vscode-free except opencode/vscode.ts
   tools/                # read/write/web/subagent tools + registry
   context/              # editor/workspace context gathering
   diff/                 # edit preview before apply
@@ -54,15 +57,13 @@ test/unit/              # unit tests
 ## Conventions
 
 - Providers: `openai | anthropic | openrouter | ollama | opencode | custom`.
-  `opencode` = OpenCode Zen via `https://opencode.ai/zen/v1/chat/completions`.
-  Its model list is NEVER hardcoded: `llm/opencodeModels.ts` fetches
-  `GET /zen/v1/models` live (free = `-free` suffix + `big-pickle`, sorted
-  free-first; 1h in-memory cache; bearer key sent when stored). Picker UI
-  (`selectProviderModel.ts`, panel dropdown) shows FREE badges with paid
-  models below; `llm/opencodeNotices.ts` owns the "provided by opencode" +
-  free-model training-data popups. Keep notices truthful to
-  https://opencode.ai/docs/zen (free/stealth tiers may train on prompts;
-  OpenAI/Anthropic-backed requests retained ~30 days).
+  `opencode` = OpenCode (Local): Buddy spawns `opencode acp` and talks ACP
+  (JSON-RPC/stdio). NEVER add hosted OpenCode endpoints (`opencode.ai/zen`,
+  `/inference`), API-key flows, or hardcoded model lists for it — models come
+  from the local session's `configOptions` (`session/set_config_option` to
+  switch). Auth/permissions/tools/sessions belong to the user's OpenCode
+  install. New code under `llm/opencode/` must stay `vscode`-free (except
+  `vscode.ts`) and unit-tested with fakes (`test/unit/opencode*.test.ts`).
 - Adding a provider means touching: `llm/router.ts` (ProviderId + case),
   `llm/providerCatalog.ts` (definition), `package.json` (`buddy.provider`
   enum + `buddy.<id>BaseUrl`), `src/extension.ts` (baseUrlKey mapping),

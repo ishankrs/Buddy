@@ -53,13 +53,21 @@ Supported providers:
 | OpenAI | Default. Set `buddy.model` or pick from the command. |
 | Anthropic | Claude models via the Anthropic API. |
 | OpenRouter | OpenAI-compatible gateway; models like `openai/gpt-4o`, `anthropic/claude-3.5-sonnet`. |
-| OpenCode Zen (`opencode`) | Curated coding models via `opencode.ai/zen` (OpenAI-compatible `chat/completions` endpoint). Get a key at `opencode.ai/zen`, then **Buddy: Set API Key** → `opencode`. The model list is **fetched live from the Zen API** — nothing hardcoded. **FREE**-badged models work without paying (paid ones are listed below, billed by opencode). Optional override via `buddy.opencodeBaseUrl`. |
+| OpenCode (Local) (`opencode`) | Optional local agent backend. Uses your locally installed OpenCode CLI via `opencode acp` — no API key in Buddy. Models, auth, and permissions are managed by OpenCode. Optional binary override via `buddy.opencodeBinary`. |
 | Ollama | Local models; no API key. Default URL `http://localhost:11434`. |
 | Custom | Any OpenAI-compatible endpoint. Set `buddy.baseUrl` and `buddy.model`. |
 
 For a self-hosted or proxy API, use **Buddy: Configure API Endpoint (URL + Key)** instead.
 
-> **Heads-up on OpenCode Zen:** every model in that list is provided and billed by **opencode.ai** — Buddy only forwards your locally stored key and requests. Buddy shows a popup about this, plus a warning on FREE models: free/stealth models may use your prompts and completions to improve or train models, so don't send secrets. Paid models follow their underlying provider retention (e.g. OpenAI/Anthropic ~30 days). Details: `opencode.ai/docs/zen`.
+> **OpenCode**
+>
+> Buddy can optionally use a locally installed OpenCode CLI as an AI backend. Install and configure OpenCode separately, then Buddy can communicate with the local OpenCode agent. Buddy does not manage or store your OpenCode credentials.
+>
+> 1. Install the OpenCode CLI and configure your account/providers/models through OpenCode itself (see the [official OpenCode docs](https://opencode.ai/docs)).
+> 2. In Buddy, run **Buddy: Select Provider and Model** → **OpenCode (Local)**, or **Buddy: Check OpenCode (Local)** to verify detection (`✓ OpenCode detected`).
+> 3. Pick a model from the list Buddy reads from your local OpenCode (saved to `buddy.model`, e.g. `opencode/big-pickle`; empty means your OpenCode default).
+>
+> How it works: Buddy spawns `opencode acp` and talks to it over JSON-RPC/stdio. One OpenCode session is kept per workspace (resumed across restarts, closed on **Clear Conversation Memory**). Tool calls run inside OpenCode under your OpenCode permissions — OpenCode asks via Buddy before privileged actions. Buddy never requests, stores, logs, or proxies OpenCode credentials, and sends no OpenCode traffic through any Buddy server.
 
 ## Using Buddy
 
@@ -121,7 +129,7 @@ buddy.maxMemoryTurns    History kept per workspace (default 20)
 
 Web search (`buddy.webSearch.*`) is on by default. Provider `auto` uses Serper, Brave, Tavily, or Google when keys exist; otherwise DuckDuckGo. Optional keys via **Buddy: Set Web Search API Key**.
 
-Provider-specific base URLs: `buddy.openaiBaseUrl`, `buddy.anthropicBaseUrl`, `buddy.openrouterBaseUrl`, `buddy.opencodeBaseUrl`, `buddy.baseUrl` (custom), `buddy.ollamaBaseUrl`.
+Provider-specific base URLs: `buddy.openaiBaseUrl`, `buddy.anthropicBaseUrl`, `buddy.openrouterBaseUrl`, `buddy.baseUrl` (custom), `buddy.ollamaBaseUrl`. OpenCode (Local) uses `buddy.opencodeBinary` (explicit CLI path, optional) instead of a URL.
 
 API keys are never stored in settings or the workspace — only in VS Code SecretStorage on your machine.
 
@@ -143,8 +151,9 @@ Auth is local-only: `/connect` writes to `~/.local/share/opencode/auth.json` (ou
 |---------|--|
 | **Buddy: Select Provider and Model** | Change provider and model |
 | **Buddy: Select Model** | Change model for the current provider |
-| **Buddy: Set API Key** | Store a provider API key (local SecretStorage only) |
+| **Buddy: Set API Key** | Store a provider API key (local SecretStorage only; never used for OpenCode) |
 | **Buddy: Remove API Key (local only)** | Delete a stored provider API key |
+| **Buddy: Check OpenCode (Local)** | Verify the local OpenCode CLI is detected |
 | **Buddy: Configure API Endpoint (URL + Key)** | Custom OpenAI-compatible API |
 | **Buddy: Open Panel** | Open the sidebar chat |
 | **Buddy: Switch UI (Chat / Panel / Both)** | Change where Buddy appears |

@@ -47,6 +47,6 @@ export function getProviderBaseUrl(providerId: ProviderId): string | undefined {
 export function formatProviderModelSummary(): string {
   const providerId = getConfiguredProviderId();
   const def = getProviderDefinition(providerId);
-  const model = resolveModelForProvider(providerId);
+  const model = resolveModelForProvider(providerId) || 'default model';
   return `${def.label} · ${model}`;
 }

@@ -65,6 +65,7 @@ describe('package.json manifest', () => {
       'buddy.setApiKey',
       'buddy.configureEndpoint',
       'buddy.clearMemory',
+      'buddy.deleteSession',
       'buddy.openPanel',
       'buddy.switchUi',
       'buddy.setWebSearchApiKey',

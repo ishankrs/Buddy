@@ -35,6 +35,8 @@ export interface PanelLlmConfig {
   modelsError?: string;
   /** Previous OpenCode chats (opencode provider only; absent when unavailable). */
   sessions?: PanelSessionOption[];
+  /** True when the backend supports permanently deleting sessions. */
+  canDeleteSessions?: boolean;
 }
 
 function baseConfig(): Omit<PanelLlmConfig, 'models' | 'modelsLoading' | 'modelsError'> {
@@ -82,20 +84,24 @@ export function getPanelLlmConfig(): PanelLlmConfig {
 async function loadSessionOptions(
   manager: OpenCodeProcessManager,
   workspacePath: string
-): Promise<PanelSessionOption[] | undefined> {
+): Promise<{ sessions: PanelSessionOption[] | undefined; canDelete: boolean }> {
+  const canDelete = await manager.supportsDelete();
   try {
     const sessions = await manager.listSessions(workspacePath);
     if (sessions.length === 0) {
-      return [];
+      return { sessions: [], canDelete };
     }
     const current = manager.currentSessionId(workspacePath);
-    return sessions.map((s) => ({
-      id: s.sessionId,
-      title: s.title?.trim() || 'Untitled chat',
-      current: s.sessionId === current,
-    }));
+    return {
+      sessions: sessions.map((s) => ({
+        id: s.sessionId,
+        title: s.title?.trim() || 'Untitled chat',
+        current: s.sessionId === current,
+      })),
+      canDelete,
+    };
   } catch {
-    return undefined;
+    return { sessions: undefined, canDelete };
   }
 }
 /**
@@ -128,12 +134,14 @@ export async function getPanelLlmConfigWithLiveModels(
         group: 'Current',
       });
     }
+    const { sessions, canDelete } = await loadSessionOptions(manager, workspacePath);
     return {
       ...base,
       model: effectiveCurrent,
       models: options,
       modelsLoading: false,
-      sessions: await loadSessionOptions(manager, workspacePath),
+      sessions,
+      canDeleteSessions: canDelete,
     };
   } catch (err) {
     const message =

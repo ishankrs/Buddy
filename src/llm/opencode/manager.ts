@@ -158,6 +158,29 @@ export class OpenCodeProcessManager {
     return this.deps.store.get(sessionStoreKey(workspacePath));
   }
 
+  /** Whether the connected backend supports `session/delete`. */
+  async supportsDelete(): Promise<boolean> {
+    try {
+      await this.ensureRunning();
+      return this.requireClient().supportsDelete();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Permanently delete a previous chat from backend history.
+   * When the deleted session is the workspace's current one, the mapping
+   * is forgotten so the next prompt starts fresh.
+   */
+  async deleteSession(workspacePath: string, sessionId: string): Promise<void> {
+    await this.ensureRunning();
+    await this.requireClient().deleteSession(sessionId);
+    if (this.currentSessionId(workspacePath) === sessionId) {
+      await this.deps.store.delete(sessionStoreKey(workspacePath));
+    }
+  }
+
   /** Previous OpenCode sessions known to the local backend. */
   async listSessions(workspacePath: string): Promise<SessionSummary[]> {
     await this.ensureRunning();

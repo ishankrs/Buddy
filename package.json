@@ -40,6 +40,8 @@
     "onCommand:buddy.setApiKey",
     "onCommand:buddy.removeApiKey",
     "onCommand:buddy.checkOpencode",
+    "onCommand:buddy.clearMemory",
+    "onCommand:buddy.deleteSession",
     "onCommand:buddy.configureEndpoint",
     "onCommand:buddy.openPanel"
   ],
@@ -188,6 +190,11 @@
         "category": "Buddy"
       },
       {
+        "command": "buddy.deleteSession",
+        "title": "Delete Previous Chat…",
+        "category": "Buddy"
+      },
+      {
         "command": "buddy.openPanel",
         "title": "Open Panel",
         "category": "Buddy",
@@ -240,6 +247,7 @@
         { "command": "buddy.openPanel" },
         { "command": "buddy.switchUi" },
         { "command": "buddy.clearMemory" },
+        { "command": "buddy.deleteSession" },
         { "command": "buddy.setWebSearchApiKey" }
       ],
       "view/title": [

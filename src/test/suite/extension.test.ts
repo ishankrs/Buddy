@@ -19,6 +19,7 @@ suite('Buddy extension integration', () => {
       'buddy.setApiKey',
       'buddy.configureEndpoint',
       'buddy.clearMemory',
+      'buddy.deleteSession',
       'buddy.openPanel',
       'buddy.switchUi',
       'buddy.setWebSearchApiKey',

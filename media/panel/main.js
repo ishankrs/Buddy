@@ -13,6 +13,7 @@
   const statusTextEl = document.getElementById('status-text');
   const statusDotEl = document.getElementById('status-dot');
   const sessionEl = document.getElementById('session');
+  const deleteSessionBtn = document.getElementById('delete-session');
   const mentionEl = document.getElementById('mention-popup');
 
   let assistantBody = null;
@@ -380,6 +381,9 @@
     if (!sessions) {
       // Non-opencode providers (or unavailable list): static summary text.
       sessionEl.style.display = 'none';
+      if (deleteSessionBtn) {
+        deleteSessionBtn.style.display = 'none';
+      }
       statusTextEl.style.display = '';
       statusTextEl.textContent = config.modelsError
         ? '⚠ ' + config.modelsError
@@ -407,6 +411,17 @@
       sessionEl.value = '__new__';
     }
     sessionEl.title = currentSummary;
+    if (deleteSessionBtn) {
+      const canDelete = config.canDeleteSessions !== false;
+      const hasSelection = sessionEl.value && sessionEl.value !== '__new__';
+      deleteSessionBtn.style.display = '';
+      deleteSessionBtn.disabled = !canDelete || !hasSelection;
+      deleteSessionBtn.title = !canDelete
+        ? 'Deleting chats is not supported by this OpenCode version — update OpenCode'
+        : hasSelection
+          ? 'Delete selected chat…'
+          : 'Select a previous chat to delete it (＋ New chat clears the view)';
+    }
   }
 
   /* ---------------- messaging ---------------- */
@@ -472,8 +487,31 @@
 
   sendBtn.addEventListener('click', sendMessage);
   clearBtn.addEventListener('click', () => {
+    // Extension host shows a modal confirmation before clearing.
     vscode.postMessage({ type: 'clear' });
   });
+
+  if (deleteSessionBtn) {
+    deleteSessionBtn.addEventListener('click', () => {
+      const selected = sessionEl.value;
+      if (!selected || selected === '__new__') {
+        // Nothing historic selected — fall back to clearing the current view
+        // (extension host confirms first).
+        vscode.postMessage({ type: 'clear' });
+        return;
+      }
+      // Extension host shows a modal confirmation before deleting.
+      setBusy(true);
+      setStatus('Confirm delete in the dialog…');
+      vscode.postMessage({ type: 'deleteSession', sessionId: selected });
+    });
+    sessionEl.addEventListener('change', () => {
+      if (deleteSessionBtn && !syncingConfig) {
+        const hasSelection = sessionEl.value && sessionEl.value !== '__new__';
+        deleteSessionBtn.disabled = !hasSelection;
+      }
+    });
+  }
 
   inputEl.addEventListener('input', autoResize);
   inputEl.addEventListener('input', scheduleMentionSearch);

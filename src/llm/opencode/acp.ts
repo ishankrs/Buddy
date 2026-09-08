@@ -101,6 +101,7 @@ interface AgentCapabilities {
   loadSession?: boolean;
   sessionCapabilities?: {
     close?: unknown;
+    delete?: unknown;
     fork?: unknown;
     list?: unknown;
     resume?: unknown;
@@ -499,6 +500,33 @@ export class AcpClient {
     } catch {
       // Best effort: the session is forgotten locally regardless.
     }
+  }
+
+  /** Whether the backend advertised `session/delete` support. */
+  supportsDelete(): boolean {
+    return !!this.capabilities.sessionCapabilities?.delete;
+  }
+
+  /**
+   * Permanently remove a session from backend history (`session/delete`).
+   * Deleted sessions disappear from future `session/list` results.
+   * Deleting an unknown session succeeds silently per the ACP spec.
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    if (!this.capabilities.sessionCapabilities?.delete) {
+      throw new OpenCodeError(
+        'The installed OpenCode version does not support deleting sessions — update OpenCode and try again.',
+        'protocol-error'
+      );
+    }
+    const peer = this.requirePeer();
+    try {
+      await peer.call('session/delete', { sessionId });
+    } catch (err) {
+      throw this.wrapCallError(err, 'delete the OpenCode session');
+    }
+    this.sessions.delete(sessionId);
+    this.activePrompts.delete(sessionId);
   }
 
   async dispose(): Promise<void> {

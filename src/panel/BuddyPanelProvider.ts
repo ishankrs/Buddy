@@ -27,6 +27,7 @@ type PanelInboundMessage =
   | { type: 'send'; message: string; mode?: string }
   | { type: 'cancel' }
   | { type: 'clear' }
+  | { type: 'deleteSession'; sessionId: string }
   | { type: 'setProvider'; providerId: string }
   | { type: 'setModel'; model: string }
   | { type: 'pickProviderModel' }
@@ -84,6 +85,9 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           break;
         case 'clear':
           await this.handleClear();
+          break;
+        case 'deleteSession':
+          await this.handleDeleteSession(raw.sessionId);
           break;
         case 'setProvider':
           await applyProviderSelection(this.context, raw.providerId as ProviderId);
@@ -146,10 +150,80 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleClear(): Promise<void> {
+    const choice = await vscode.window.showWarningMessage(
+      'Start a new chat? The current conversation view will be cleared. This cannot be undone.',
+      { modal: true },
+      'New chat',
+      'Cancel'
+    );
+    if (choice !== 'New chat') {
+      // Re-push config so the webview restores the session dropdown selection.
+      this.pushLlmConfig();
+      return;
+    }
     this.cancelRun();
     await startFreshConversation(this.context, this.memory);
     this.post({ type: 'cleared' });
     this.pushLlmConfig();
+  }
+
+  /**
+   * Permanently delete a previous chat after explicit user confirmation.
+   * When the deleted chat is the current one, the view is cleared so the
+   * next prompt starts fresh; otherwise the view is left untouched.
+   */
+  private async handleDeleteSession(sessionId: string): Promise<void> {
+    if (!sessionId || sessionId === '__new__') {
+      await this.handleClear();
+      return;
+    }
+    const workspacePath = getWorkspacePath();
+    const manager = getSharedManager(nodeManagerDeps(this.context));
+
+    let title = 'this chat';
+    try {
+      const sessions = await manager.listSessions(workspacePath);
+      const found = sessions.find((s) => s.sessionId === sessionId);
+      if (found?.title?.trim()) {
+        const short =
+          found.title.trim().length > 60
+            ? found.title.trim().slice(0, 59) + '…'
+            : found.title.trim();
+        title = `"${short}"`;
+      }
+    } catch {
+      // Best effort: fall back to the generic label.
+    }
+
+    const isCurrent = manager.currentSessionId(workspacePath) === sessionId;
+    const choice = await vscode.window.showWarningMessage(
+      isCurrent
+        ? `Delete ${title}? It will be permanently removed and the current view cleared. This cannot be undone.`
+        : `Delete ${title}? It will be permanently removed from history. This cannot be undone.`,
+      { modal: true },
+      'Delete',
+      'Cancel'
+    );
+    if (choice !== 'Delete') {
+      this.pushLlmConfig();
+      return;
+    }
+
+    this.cancelRun();
+    this.post({ type: 'progress', text: 'Deleting conversation…' });
+    try {
+      await manager.deleteSession(workspacePath, sessionId);
+      if (isCurrent) {
+        await this.memory.clear();
+        this.post({ type: 'cleared' });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.post({ type: 'error', text: `Could not delete that conversation. ${message}` });
+    } finally {
+      this.post({ type: 'assistantDone' });
+      this.pushLlmConfig();
+    }
   }
 
   /**
@@ -248,7 +322,7 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   <header class="topbar">
     <img class="logo" src="${logoUri}" width="22" height="22" alt="Buddy logo" />
     <div class="title">Buddy</div>
-    <div class="status"><span id="status-dot" class="dot"></span><select id="session" class="session-select" aria-label="Conversation"></select><span id="status-text">Loading…</span></div>
+    <div class="status"><span id="status-dot" class="dot"></span><select id="session" class="session-select" aria-label="Conversation"></select><button id="delete-session" class="icon-btn danger" type="button" title="Delete selected chat…">🗑</button><span id="status-text">Loading…</span></div>
   </header>
 
   <div id="messages" class="messages" aria-live="polite">

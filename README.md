@@ -95,6 +95,20 @@ In VS Code Chat:
 | `/models` | Change the model for the current provider |
 | `/provider` | Change the provider and model |
 | `/help` | List all commands |
+| `/clear` | Alias for `/new` |
+| `/model` | Alias for `/models` |
+| `/status` | Show version, provider, model, and backend status |
+| `/context` | Show what is filling the conversation context |
+| `/doctor` | Check the setup (keys, tools, OpenCode) and suggest fixes |
+| `/compact [focus]` | Summarize the conversation to free up context |
+| `/review [security]` | Review working-tree changes (add `security` for a security focus) |
+| `/diff` | Show working-tree changes |
+| `/export [file]` | Save the transcript as a markdown file |
+| `/init` | Generate a starter `AGENTS.md` for the repo |
+| `/copy [N]` | Copy the Nth-last response to the clipboard |
+| `/btw <question>` | Ask a side question without saving it to history |
+| `/feedback [text]` | Open the issue tracker to report a problem |
+| `/permissions` | View and change tool approval settings |
 
 Modes work via `@buddy /…` in chat or the mode dropdown in the panel; action commands (`/new`, `/models`, `/provider`, `/help`) can be typed in either place.
 

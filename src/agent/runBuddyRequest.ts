@@ -9,15 +9,12 @@ import { modeLabel, type AgentMode } from './modes';
 export { resolveUserMessageAndMode } from './requestRouting';
 import { resolveUserMessageAndMode } from './requestRouting';
 import {
-  buildHelpMarkdown,
   isAgentAction,
   parseActionCommand,
   type AgentAction,
 } from './commands';
-import { formatProviderModelSummary } from '../llm/providerConfig';
-import { getSharedManager } from '../llm/opencode/manager';
-import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
-import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
+import { runAgentAction, startFreshConversation } from './actions';
+export { startFreshConversation };
 
 export interface BuddyRequestInput {
   userMessage: string;
@@ -27,61 +24,6 @@ export interface BuddyRequestInput {
   token: vscode.CancellationToken;
   memory: SessionMemory;
   historyMessages?: import('../llm/types').Message[];
-}
-
-export interface AgentActionInput {
-  action: AgentAction;
-  rest: string;
-  stream: vscode.ChatResponseStream;
-  token: vscode.CancellationToken;
-  memory: SessionMemory;
-}
-
-/** Clear Buddy memory and reset the OpenCode session (fresh conversation). */
-export async function startFreshConversation(
-  context: vscode.ExtensionContext,
-  memory: SessionMemory
-): Promise<void> {
-  await memory.clear();
-  try {
-    await getSharedManager(nodeManagerDeps(context)).resetSession(getWorkspacePath());
-  } catch {
-    // Best effort: memory is cleared regardless.
-  }
-}
-
-/**
- * Execute an action slash-command. Returns a follow-up message to send as a
- * fresh request (only `/new <message>` does this), or undefined when the
- * action was fully handled and nothing further should run.
- */
-export async function runAgentAction(
-  input: AgentActionInput,
-  context: vscode.ExtensionContext
-): Promise<{ message: string } | undefined> {
-  switch (input.action) {
-    case 'new': {
-      await startFreshConversation(context, input.memory);
-      if (!input.rest) {
-        input.stream.markdown(
-          '✨ Started a new conversation. Memory and OpenCode session cleared.'
-        );
-        return undefined;
-      }
-      return { message: input.rest };
-    }
-    case 'models':
-      await selectModelOnly(context);
-      input.stream.markdown(`Now using **${formatProviderModelSummary()}**.`);
-      return undefined;
-    case 'provider':
-      await selectProviderAndModel(context);
-      input.stream.markdown(`Now using **${formatProviderModelSummary()}**.`);
-      return undefined;
-    case 'help':
-      input.stream.markdown(buildHelpMarkdown());
-      return undefined;
-  }
 }
 
 function actionFromChat(
@@ -137,6 +79,7 @@ export async function runBuddyRequest(
       await input.memory.saveTurn({
         userMessage: `[${modeLabel(input.mode)}] ${input.userMessage}`,
         assistantSummary: result.assistantText.slice(0, 4000),
+        assistantFullText: result.assistantText,
         messages: result.messages,
         timestamp: Date.now(),
       });

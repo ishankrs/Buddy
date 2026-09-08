@@ -6,6 +6,8 @@ const MEMORY_KEY = 'buddy.conversationHistory';
 export interface StoredTurn {
   userMessage: string;
   assistantSummary: string;
+  /** Full assistant text (for /copy, /export). May be absent on old turns. */
+  assistantFullText?: string;
   messages: Message[];
   timestamp: number;
 }

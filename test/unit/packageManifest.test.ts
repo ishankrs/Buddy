@@ -27,7 +27,31 @@ describe('package.json manifest', () => {
     const commandNames = participant?.commands?.map((c) => c.name) ?? [];
     assert.deepEqual(
       commandNames.sort(),
-      ['debug', 'help', 'models', 'new', 'plan', 'provider', 'subagent', 'swarm', 'think'].sort()
+      [
+        'btw',
+        'clear',
+        'compact',
+        'context',
+        'copy',
+        'debug',
+        'diff',
+        'doctor',
+        'export',
+        'feedback',
+        'help',
+        'init',
+        'model',
+        'models',
+        'new',
+        'permissions',
+        'plan',
+        'provider',
+        'review',
+        'status',
+        'subagent',
+        'swarm',
+        'think',
+      ].sort()
     );
   });
 

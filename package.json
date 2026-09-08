@@ -106,6 +106,62 @@
           {
             "name": "help",
             "description": "List Buddy commands"
+          },
+          {
+            "name": "clear",
+            "description": "Start a fresh conversation"
+          },
+          {
+            "name": "model",
+            "description": "Change the model for the current provider"
+          },
+          {
+            "name": "status",
+            "description": "Show version, provider, and backend status"
+          },
+          {
+            "name": "context",
+            "description": "Show what is filling the conversation context"
+          },
+          {
+            "name": "doctor",
+            "description": "Check the setup and suggest fixes"
+          },
+          {
+            "name": "compact",
+            "description": "Summarize the conversation to free up context"
+          },
+          {
+            "name": "review",
+            "description": "Review working-tree changes for bugs"
+          },
+          {
+            "name": "diff",
+            "description": "Show working-tree changes"
+          },
+          {
+            "name": "export",
+            "description": "Save the transcript as a markdown file"
+          },
+          {
+            "name": "init",
+            "description": "Generate a starter AGENTS.md for this repo"
+          },
+          {
+            "name": "copy",
+            "description": "Copy the last response to the clipboard"
+          },
+          {
+            "name": "btw",
+            "description": "Ask a side question without saving it"
+          },
+          {
+            "name": "feedback",
+            "description": "Open the issue tracker to report a problem"
+          },
+          {
+            "name": "permissions",
+            "description": "View and change tool approval settings"
           }
         ]
       }

@@ -17,6 +17,23 @@ describe('parseActionCommand', () => {
     assert.deepEqual(parseActionCommand('  /models  '), { action: 'models', rest: '' });
     assert.deepEqual(parseActionCommand('/PROVIDER'), { action: 'provider', rest: '' });
     assert.deepEqual(parseActionCommand('/help me'), { action: 'help', rest: 'me' });
+    assert.deepEqual(parseActionCommand('/compact focus on auth'), {
+      action: 'compact',
+      rest: 'focus on auth',
+    });
+    assert.deepEqual(parseActionCommand('/copy 2'), { action: 'copy', rest: '2' });
+    assert.deepEqual(parseActionCommand('/review security'), {
+      action: 'review',
+      rest: 'security',
+    });
+    assert.deepEqual(parseActionCommand('/export notes.md'), {
+      action: 'export',
+      rest: 'notes.md',
+    });
+    assert.deepEqual(parseActionCommand('/btw why is this slow?'), {
+      action: 'btw',
+      rest: 'why is this slow?',
+    });
   });
 
   it('ignores modes, plain text, and mid-text slashes', () => {
@@ -40,11 +57,27 @@ describe('isAgentAction', () => {
 });
 
 describe('AGENT_ACTIONS', () => {
-  it('declares new, models, provider, and help', () => {
-    assert.deepEqual(
-      AGENT_ACTIONS.map((a) => a.name).sort(),
-      ['help', 'models', 'new', 'provider']
-    );
+  it('declares the full action set', () => {
+    assert.deepEqual(AGENT_ACTIONS.map((a) => a.name).sort(), [
+      'btw',
+      'clear',
+      'compact',
+      'context',
+      'copy',
+      'diff',
+      'doctor',
+      'export',
+      'feedback',
+      'help',
+      'init',
+      'model',
+      'models',
+      'new',
+      'permissions',
+      'provider',
+      'review',
+      'status',
+    ]);
   });
 });
 

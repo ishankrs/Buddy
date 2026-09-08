@@ -14,7 +14,7 @@ import type { OpenCodeProcessManager } from './manager';
 export interface OpencodeLocalProviderOptions {
   manager: OpenCodeProcessManager;
   workspacePath: string;
-  /** Full OpenCode model value (e.g. `opencode/big-pickle`); '' = OpenCode default. */
+  /** Full OpenCode model value as advertised by the local session (e.g. `provider-id/model-id`); '' = OpenCode default. */
   model: string;
   planMode: boolean;
 }

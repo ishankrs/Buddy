@@ -42,6 +42,11 @@ function spawnProcess(binary: string, args: string[], cwd: string): SpawnedProce
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });
+  // Drain stderr continuously: an un-read pipe can fill up and stall the
+  // child process (opencode logs to stderr). Output is discarded — ACP
+  // diagnostics travel over stdout as JSON-RPC.
+  child.stderr?.on('data', () => undefined);
+  child.stderr?.on('error', () => undefined);
   return {
     writeStdin: (data) => {
       child.stdin?.write(data);

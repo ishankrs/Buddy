@@ -415,6 +415,11 @@ export class AcpClient {
   }
 
   private wrapCallError(err: unknown, action: string): OpenCodeError {
+    // Never downgrade an already-classified error (e.g. process crash
+    // surfacing while a prompt was in flight).
+    if (err instanceof OpenCodeError) {
+      return err;
+    }
     const message = describeError(err);
     if (/auth|login|unauthenticated|not signed in|credential/i.test(message)) {
       return new OpenCodeError(

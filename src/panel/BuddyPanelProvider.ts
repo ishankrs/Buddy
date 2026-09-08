@@ -18,6 +18,7 @@ import {
 import { getSharedManager } from '../llm/opencode/manager';
 import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
 import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
+import { searchWorkspaceFiles } from '../context/gatherer';
 import type { ProviderId } from '../llm/router';
 
 type PanelInboundMessage =
@@ -28,7 +29,8 @@ type PanelInboundMessage =
   | { type: 'setProvider'; providerId: string }
   | { type: 'setModel'; model: string }
   | { type: 'pickProviderModel' }
-  | { type: 'pickModel' };
+  | { type: 'pickModel' }
+  | { type: 'searchFiles'; query: string; requestId: number };
 
 export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'buddy.panel';
@@ -111,6 +113,11 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           await selectModelOnly(this.context);
           this.pushLlmConfig();
           break;
+        case 'searchFiles': {
+          const files = await searchWorkspaceFiles(raw.query);
+          this.post({ type: 'fileResults', requestId: raw.requestId, files });
+          break;
+        }
       }
     });
   }
@@ -225,7 +232,8 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
 
   <footer class="composer">
     <div class="composer-card">
-      <textarea id="input" rows="1" placeholder="Message Buddy…  (Enter to send, Shift+Enter for a new line)"></textarea>
+      <div id="mention-popup" class="mention-popup hidden"></div>
+      <textarea id="input" rows="1" placeholder="Message Buddy…  (type @ to tag files)"></textarea>
       <div class="toolbar">
         <select id="provider" aria-label="LLM provider"></select>
         <button id="model-pill" class="pill" type="button" title="Choose model">◇ Select model</button>

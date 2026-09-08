@@ -12,12 +12,20 @@
   const modelPill = document.getElementById('model-pill');
   const statusTextEl = document.getElementById('status-text');
   const statusDotEl = document.getElementById('status-dot');
+  const mentionEl = document.getElementById('mention-popup');
 
   let assistantBody = null;
   let assistantText = '';
   let busy = false;
   let syncingConfig = false;
   let currentSummary = '';
+
+  // @-mention file tagging state
+  let mentionRequestId = 0;
+  let mentionItems = [];
+  let mentionIndex = -1;
+  let mentionStart = -1; // caret-relative start of "@query" in input value
+  let mentionTimer = null;
 
   /* ---------------- markdown ---------------- */
 
@@ -328,6 +336,11 @@
     }
     inputEl.value = '';
     autoResize();
+    hideMentionPopup();
+    if (mentionTimer) {
+      clearTimeout(mentionTimer);
+      mentionTimer = null;
+    }
     setBusy(true);
     setStatus('Buddy is working…');
     vscode.postMessage({
@@ -364,7 +377,34 @@
   });
 
   inputEl.addEventListener('input', autoResize);
+  inputEl.addEventListener('input', scheduleMentionSearch);
+  inputEl.addEventListener('click', scheduleMentionSearch);
   inputEl.addEventListener('keydown', (e) => {
+    if (!mentionEl.classList.contains('hidden') && mentionItems.length > 0) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const dir = e.key === 'ArrowDown' ? 1 : -1;
+        mentionIndex = (mentionIndex + dir + mentionItems.length) % mentionItems.length;
+        paintMentionPopup();
+        return;
+      }
+      if (e.key === 'Enter' && e.shiftKey === false && mentionIndex >= 0) {
+        // Enter picks the highlighted file while the popup is open.
+        e.preventDefault();
+        applyMention(mentionItems[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        hideMentionPopup();
+        return;
+      }
+      if (e.key === 'Tab' && mentionIndex >= 0) {
+        e.preventDefault();
+        applyMention(mentionItems[mentionIndex]);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
@@ -407,11 +447,128 @@
     document.body.removeChild(ta);
   }
 
+  /* ---------------- @-mention file tagging ---------------- */
+
+  function mentionTrigger() {
+    const caret = inputEl.selectionStart || 0;
+    const before = inputEl.value.slice(0, caret);
+    // "@query" at start or after whitespace; query has no spaces.
+    const match = /(^|\s)@([^\s@]*)$/.exec(before);
+    if (!match) {
+      return null;
+    }
+    return { query: match[2], start: caret - match[2].length - 1 };
+  }
+
+  function scheduleMentionSearch() {
+    if (mentionTimer) {
+      clearTimeout(mentionTimer);
+      mentionTimer = null;
+    }
+    const trigger = mentionTrigger();
+    if (!trigger) {
+      hideMentionPopup();
+      return;
+    }
+    mentionStart = trigger.start;
+    mentionTimer = setTimeout(() => {
+      mentionTimer = null;
+      mentionRequestId += 1;
+      vscode.postMessage({
+        type: 'searchFiles',
+        query: trigger.query,
+        requestId: mentionRequestId,
+      });
+    }, 150);
+  }
+
+  function hideMentionPopup() {
+    mentionEl.classList.add('hidden');
+    mentionEl.innerHTML = '';
+    mentionItems = [];
+    mentionIndex = -1;
+    mentionStart = -1;
+  }
+
+  function paintMentionPopup() {
+    mentionEl.innerHTML = '';
+    if (mentionItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'mention-empty';
+      empty.textContent = 'No files match — keep typing or press Esc';
+      mentionEl.appendChild(empty);
+    } else {
+      mentionItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'mention-item' + (idx === mentionIndex ? ' selected' : '');
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = '📄 ' + item.label;
+        row.appendChild(name);
+        if (item.detail) {
+          const dir = document.createElement('span');
+          dir.className = 'dir';
+          dir.textContent = item.detail;
+          row.appendChild(dir);
+        }
+        row.addEventListener('mousedown', (e) => {
+          e.preventDefault(); // keep textarea focus/caret
+          applyMention(item);
+        });
+        row.addEventListener('mousemove', () => {
+          if (mentionIndex !== idx) {
+            mentionIndex = idx;
+            paintMentionPopup();
+          }
+        });
+        mentionEl.appendChild(row);
+      });
+    }
+    mentionEl.classList.remove('hidden');
+  }
+
+  function showMentionResults(requestId, files) {
+    if (requestId !== mentionRequestId) {
+      return; // stale response
+    }
+    // The user may have typed on; re-anchor to the current trigger.
+    const trigger = mentionTrigger();
+    if (!trigger) {
+      hideMentionPopup();
+      return;
+    }
+    mentionStart = trigger.start;
+    mentionItems = files || [];
+    mentionIndex = mentionItems.length > 0 ? 0 : -1;
+    paintMentionPopup();
+  }
+
+  function applyMention(item) {
+    if (mentionStart < 0) {
+      hideMentionPopup();
+      return;
+    }
+    const caret = inputEl.selectionStart || inputEl.value.length;
+    const before = inputEl.value.slice(0, mentionStart);
+    const after = inputEl.value.slice(caret);
+    const needsQuotes = /[\s]/.test(item.label);
+    const tag = '@' + (needsQuotes ? '"' + item.label + '"' : item.label) + ' ';
+    inputEl.value = before + tag + after.replace(/^\s+/, '');
+    const pos = (before + tag).length;
+    inputEl.focus();
+    inputEl.setSelectionRange(pos, pos);
+    autoResize();
+    hideMentionPopup();
+  }
+
   window.addEventListener('message', (event) => {
     const msg = event.data;
     switch (msg.type) {
       case 'llmConfig':
         applyLlmConfig(msg.config);
+        break;
+      case 'fileResults':
+        showMentionResults(msg.requestId, msg.files);
         break;
       case 'userMessage': {
         const row = appendRow('user');

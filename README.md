@@ -114,6 +114,8 @@ The agent loop can call tools to:
 
 It uses your active editor, selection, `@` file references, and diagnostics as context.
 
+In the sidebar panel, type `@` to tag files: start typing a filename to search the workspace (empty `@` lists open editors), pick with ↑/↓ + Enter or click. Tagged files (`@path/to/file.ts`, or `@"path with spaces.ts"`) are read into the prompt context automatically.
+
 ## Configuration
 
 Common settings (Settings → search `buddy`):

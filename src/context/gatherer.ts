@@ -103,6 +103,112 @@ async function readFileSafe(uri: vscode.Uri): Promise<string | undefined> {
   }
 }
 
+/**
+ * Find `@path` (or `@"path with spaces"`) tags in a chat message, resolve
+ * them against the workspace, and read their contents. Tags that don't
+ * resolve to a workspace file are ignored. Used by the panel composer,
+ * which has no native file-attach UI.
+ */
+export async function resolveTaggedFiles(
+  message: string
+): Promise<Array<{ path: string; content?: string }>> {
+  const tags = new Set<string>();
+  const re = /@"([^"]+)"|@(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(message)) !== null) {
+    const tag = (match[1] ?? match[2] ?? '').trim().replace(/[,.;:!?]+$/, '');
+    if (tag) {
+      tags.add(tag);
+    }
+  }
+
+  const results: Array<{ path: string; content?: string }> = [];
+  for (const tag of tags) {
+    const resolved = resolveWorkspacePath(tag);
+    if (!resolved) {
+      continue;
+    }
+    // Skip directories.
+    let stat: vscode.FileStat;
+    try {
+      stat = await vscode.workspace.fs.stat(vscode.Uri.file(resolved));
+    } catch {
+      continue;
+    }
+    if (stat.type !== vscode.FileType.File && stat.type !== vscode.FileType.Unknown) {
+      continue;
+    }
+    const content = await readFileSafe(vscode.Uri.file(resolved));
+    if (content !== undefined) {
+      results.push({ path: resolved, content });
+    }
+  }
+  return results;
+}
+
+/** List workspace files matching a query for @-mention completion. */
+export async function searchWorkspaceFiles(
+  query: string,
+  maxResults = 15
+): Promise<Array<{ label: string; detail: string; fsPath: string }>> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
+    return [];
+  }
+  const root = folders[0].uri.fsPath;
+
+  // Empty query: offer open editors (most relevant) instead of a glob dump.
+  if (!query.trim()) {
+    const seen = new Set<string>();
+    const out: Array<{ label: string; detail: string; fsPath: string }> = [];
+    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
+    for (const tab of tabs) {
+      const input = tab.input;
+      const uri =
+        input instanceof vscode.TabInputText ? input.uri : undefined;
+      if (!uri || uri.scheme !== 'file' || seen.has(uri.fsPath)) {
+        continue;
+      }
+      seen.add(uri.fsPath);
+      out.push(toFileEntry(root, uri.fsPath));
+      if (out.length >= maxResults) {
+        break;
+      }
+    }
+    return out;
+  }
+
+  const sanitized = query.trim().replace(/[{}[\]*?]/g, '');
+  if (!sanitized) {
+    return [];
+  }
+  const pattern = `**/*${sanitized}*`;
+  const exclude = '{**/node_modules/**,**/dist/**,**/out/**,**/.git/**,**/.vscode-test/**,**/*.vsix}';
+  const uris = await vscode.workspace.findFiles(pattern, exclude, maxResults);
+  return uris
+    .filter((u) => u.scheme === 'file')
+    .map((u) => toFileEntry(root, u.fsPath));
+}
+
+function toFileEntry(
+  root: string,
+  fsPath: string
+): { label: string; detail: string; fsPath: string } {
+  const rel = path.relative(root, fsPath).replace(/\\/g, '/');
+  const label = rel.startsWith('..') ? fsPath : rel;
+  const dir = label.includes('/') ? label.slice(0, label.lastIndexOf('/')) : '';
+  return { label, detail: dir, fsPath };
+}
+
+/** Append file references (e.g. resolved @-tags) and refresh the summary. */
+export function addReferences(
+  ctx: GatheredContext,
+  refs: Array<{ path: string; content?: string }>
+): void {
+  ctx.references.push(...refs);
+  ctx.summary = formatContextSummary(ctx);
+}
+
 function formatContextSummary(ctx: GatheredContext): string {
   const parts: string[] = [];
 

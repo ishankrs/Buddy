@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { GatheredContext } from '../context/gatherer';
-import { gatherContext, gatherEditorContext } from '../context/gatherer';
+import { addReferences, gatherContext, gatherEditorContext, resolveTaggedFiles } from '../context/gatherer';
 import { SessionMemory } from './memory';
 import { runAgentLoop } from './loop';
 import { runSwarm } from './swarm';
@@ -125,6 +125,11 @@ export async function runFromPanelMessage(
   }
 
   options.stream.progress(`Gathering context (${modeLabel(mode)} mode)...`);
+
+  const tagged = await resolveTaggedFiles(userMessage);
+  if (tagged.length > 0) {
+    addReferences(gathered, tagged);
+  }
 
   const priorTurns = await options.memory.loadTurns();
   const historyMessages = options.memory.flattenHistoryForPrompt(priorTurns);

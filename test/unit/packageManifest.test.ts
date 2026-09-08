@@ -25,7 +25,10 @@ describe('package.json manifest', () => {
     assert.ok(participant);
 
     const commandNames = participant?.commands?.map((c) => c.name) ?? [];
-    assert.deepEqual(commandNames.sort(), ['debug', 'plan', 'subagent', 'swarm', 'think'].sort());
+    assert.deepEqual(
+      commandNames.sort(),
+      ['debug', 'help', 'models', 'new', 'plan', 'provider', 'subagent', 'swarm', 'think'].sort()
+    );
   });
 
   it('declares MIT license', () => {

@@ -17,6 +17,7 @@ import {
 } from '../llm/panelProviderSettings';
 import { getSharedManager } from '../llm/opencode/manager';
 import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
+import { startFreshConversation } from '../agent/runBuddyRequest';
 import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
 import { searchWorkspaceFiles } from '../context/gatherer';
 import type { ProviderId } from '../llm/router';
@@ -142,13 +143,7 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
 
   private async handleClear(): Promise<void> {
     this.cancelRun();
-    await this.memory.clear();
-    // Fresh OpenCode session next time (Buddy ↔ OpenCode session mapping).
-    try {
-      await getSharedManager(nodeManagerDeps(this.context)).resetSession(getWorkspacePath());
-    } catch {
-      // Best effort: memory is cleared regardless.
-    }
+    await startFreshConversation(this.context, this.memory);
     this.post({ type: 'cleared' });
   }
 
@@ -224,7 +219,7 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   <div id="messages" class="messages" aria-live="polite">
     <div id="empty-state" class="empty">
       <div class="empty-title">How can I help?</div>
-      <div class="empty-sub">Ask about your code, plan a change,<br/>or hand off a task.</div>
+      <div class="empty-sub">Ask about your code, plan a change,<br/>or hand off a task.<br/>Try <b>/new</b>, <b>/models</b>, or <b>/help</b>.</div>
     </div>
   </div>
 

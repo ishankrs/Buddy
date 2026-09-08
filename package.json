@@ -90,6 +90,22 @@
           {
             "name": "subagent",
             "description": "Spawn a focused subagent for a scoped task"
+          },
+          {
+            "name": "new",
+            "description": "Start a fresh conversation (clears memory)"
+          },
+          {
+            "name": "models",
+            "description": "Change the model for the current provider"
+          },
+          {
+            "name": "provider",
+            "description": "Change the provider and model"
+          },
+          {
+            "name": "help",
+            "description": "List Buddy commands"
           }
         ]
       }

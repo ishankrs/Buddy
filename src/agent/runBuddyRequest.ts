@@ -8,6 +8,16 @@ import { runSubagentMode } from './subagent';
 import { modeLabel, type AgentMode } from './modes';
 export { resolveUserMessageAndMode } from './requestRouting';
 import { resolveUserMessageAndMode } from './requestRouting';
+import {
+  buildHelpMarkdown,
+  isAgentAction,
+  parseActionCommand,
+  type AgentAction,
+} from './commands';
+import { formatProviderModelSummary } from '../llm/providerConfig';
+import { getSharedManager } from '../llm/opencode/manager';
+import { getWorkspacePath, nodeManagerDeps } from '../llm/opencode/vscode';
+import { selectModelOnly, selectProviderAndModel } from '../llm/selectProviderModel';
 
 export interface BuddyRequestInput {
   userMessage: string;
@@ -17,6 +27,71 @@ export interface BuddyRequestInput {
   token: vscode.CancellationToken;
   memory: SessionMemory;
   historyMessages?: import('../llm/types').Message[];
+}
+
+export interface AgentActionInput {
+  action: AgentAction;
+  rest: string;
+  stream: vscode.ChatResponseStream;
+  token: vscode.CancellationToken;
+  memory: SessionMemory;
+}
+
+/** Clear Buddy memory and reset the OpenCode session (fresh conversation). */
+export async function startFreshConversation(
+  context: vscode.ExtensionContext,
+  memory: SessionMemory
+): Promise<void> {
+  await memory.clear();
+  try {
+    await getSharedManager(nodeManagerDeps(context)).resetSession(getWorkspacePath());
+  } catch {
+    // Best effort: memory is cleared regardless.
+  }
+}
+
+/**
+ * Execute an action slash-command. Returns a follow-up message to send as a
+ * fresh request (only `/new <message>` does this), or undefined when the
+ * action was fully handled and nothing further should run.
+ */
+export async function runAgentAction(
+  input: AgentActionInput,
+  context: vscode.ExtensionContext
+): Promise<{ message: string } | undefined> {
+  switch (input.action) {
+    case 'new': {
+      await startFreshConversation(context, input.memory);
+      if (!input.rest) {
+        input.stream.markdown(
+          '✨ Started a new conversation. Memory and OpenCode session cleared.'
+        );
+        return undefined;
+      }
+      return { message: input.rest };
+    }
+    case 'models':
+      await selectModelOnly(context);
+      input.stream.markdown(`Now using **${formatProviderModelSummary()}**.`);
+      return undefined;
+    case 'provider':
+      await selectProviderAndModel(context);
+      input.stream.markdown(`Now using **${formatProviderModelSummary()}**.`);
+      return undefined;
+    case 'help':
+      input.stream.markdown(buildHelpMarkdown());
+      return undefined;
+  }
+}
+
+function actionFromChat(
+  command: string | undefined,
+  prompt: string
+): { action: AgentAction; rest: string } | undefined {
+  if (command && isAgentAction(command)) {
+    return { action: command, rest: prompt.trim() };
+  }
+  return parseActionCommand(prompt);
 }
 
 export async function runBuddyRequest(
@@ -86,6 +161,25 @@ export async function runFromChatRequest(
   memory: SessionMemory
 ): Promise<void> {
   const gathered = await gatherContext(request);
+  const action = actionFromChat(request.command, request.prompt);
+  if (action) {
+    const next = await runAgentAction(
+      { ...action, stream, token, memory },
+      context
+    );
+    if (!next?.message) {
+      return;
+    }
+    await runBuddyRequest(context, {
+      userMessage: next.message,
+      mode: 'default',
+      contextSummary: gathered.summary,
+      stream,
+      token,
+      memory,
+    });
+    return;
+  }
   const { mode, userMessage } = resolveUserMessageAndMode(request.command, request.prompt);
 
   stream.progress(`Gathering context (${modeLabel(mode)} mode)...`);
@@ -129,6 +223,24 @@ export async function runFromPanelMessage(
   const tagged = await resolveTaggedFiles(userMessage);
   if (tagged.length > 0) {
     addReferences(gathered, tagged);
+  }
+
+  const action = parseActionCommand(userMessage);
+  if (action) {
+    const next = await runAgentAction(
+      {
+        action: action.action,
+        rest: action.rest,
+        stream: options.stream,
+        token: options.token,
+        memory: options.memory,
+      },
+      context
+    );
+    if (!next?.message) {
+      return;
+    }
+    userMessage = next.message;
   }
 
   const priorTurns = await options.memory.loadTurns();

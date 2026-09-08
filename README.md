@@ -91,6 +91,12 @@ In VS Code Chat:
 | `/debug` | Focus on errors, logs, and verification |
 | `/swarm` | Split work across parallel workers |
 | `/subagent` | Hand off a scoped subtask |
+| `/new [message]` | Start a fresh conversation (clears memory), optionally sending a message right away |
+| `/models` | Change the model for the current provider |
+| `/provider` | Change the provider and model |
+| `/help` | List all commands |
+
+Modes work via `@buddy /…` in chat or the mode dropdown in the panel; action commands (`/new`, `/models`, `/provider`, `/help`) can be typed in either place.
 
 You can also say things like *“open a subagent to refactor the logger”* — Buddy will pick that up in normal chat.
 

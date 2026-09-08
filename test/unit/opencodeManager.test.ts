@@ -146,6 +146,21 @@ describe('OpenCodeProcessManager', () => {
     assert.deepEqual(order, ['start', 'end', 'start', 'end']);
   });
 
+  it('starts fresh when a session advertises no models', async () => {
+    const d = deps();
+    const { calls, client } = fakeClient({ createdId: 'ses_1' });
+    const emptyClient = {
+      ...client,
+      getModelOptions: () => ({ current: '', options: [] }),
+    } as unknown as AcpClient;
+    const manager = new OpenCodeProcessManager(d);
+    manager.setClientFactory(() => emptyClient);
+    await assert.rejects(manager.getModelOptions('/work/a'), /did not advertise any models/);
+    // Reset (close) + recreate happened before giving up.
+    assert.ok(calls.includes('close:ses_1'));
+    assert.equal(calls.filter((c) => c === 'create').length, 2);
+  });
+
   it('dispose() tears down the client', async () => {
     const d = deps();
     const { calls, client } = fakeClient();

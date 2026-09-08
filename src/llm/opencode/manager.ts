@@ -193,13 +193,22 @@ export class OpenCodeProcessManager {
   ): Promise<{ current: string; options: Array<{ value: string; name: string; description?: string }> }> {
     const { sessionId } = await this.ensureSession(workspacePath);
     const found = this.requireClient().getModelOptions(sessionId);
-    if (!found || found.options.length === 0) {
+    if (found && found.options.length > 0) {
+      return found;
+    }
+    // The backend handed us a session with no configuration (e.g. an older
+    // OpenCode whose resume response carries none). A fresh session always
+    // advertises the model list, so reset once instead of dead-ending.
+    await this.resetSession(workspacePath);
+    const fresh = await this.ensureSession(workspacePath);
+    const retry = this.requireClient().getModelOptions(fresh.sessionId);
+    if (!retry || retry.options.length === 0) {
       throw new OpenCodeError(
         'The local OpenCode did not advertise any models for this session. Configure your providers/models through OpenCode.',
         'protocol-error'
       );
     }
-    return found;
+    return retry;
   }
 
   async setModel(workspacePath: string, value: string): Promise<SessionConfigOption[]> {

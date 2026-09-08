@@ -77,7 +77,21 @@ class FakeOpenCode implements SpawnedProcess {
       return;
     }
     if (msg.method === 'session/resume') {
-      this.emit({ jsonrpc: '2.0', id: msg.id, result: {} });
+      this.emit({
+        jsonrpc: '2.0',
+        id: msg.id,
+        result: {
+          configOptions: [
+            {
+              id: 'model',
+              name: 'Model',
+              type: 'select',
+              currentValue: this.currentModel,
+              options: this.modelOptions,
+            },
+          ],
+        },
+      });
       return;
     }
     if (msg.method === 'session/set_config_option') {
@@ -289,6 +303,16 @@ describe('AcpClient', () => {
     await client.dispose();
     assert.deepEqual(fake.killed, ['SIGTERM']);
     assert.equal(client.running, false);
+  });
+
+  it('keeps config options across resume', async () => {
+    await started();
+    const resumed = await client.resumeSession('ses_old', '/tmp');
+    assert.equal(resumed, true);
+    assert.deepEqual(client.getModelOptions('ses_old'), {
+      current: 'opencode/big-pickle',
+      options: fake.modelOptions,
+    });
   });
 
   it('closeSession forgets the session', async () => {

@@ -195,10 +195,14 @@ export class AcpClient {
   async resumeSession(sessionId: string, cwd: string): Promise<boolean> {
     const peer = this.requirePeer();
     try {
-      await peer.call('session/resume', { sessionId, cwd, mcpServers: [] });
-      if (!this.sessions.has(sessionId)) {
-        this.sessions.set(sessionId, { sessionId, configOptions: [] });
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await peer.call<any>('session/resume', { sessionId, cwd, mcpServers: [] });
+      // Resume responses MAY carry the current session configuration —
+      // keep it, otherwise the model picker has nothing to show.
+      const configOptions = Array.isArray(result?.configOptions)
+        ? (result.configOptions as SessionConfigOption[])
+        : (this.sessions.get(sessionId)?.configOptions ?? []);
+      this.sessions.set(sessionId, { sessionId, configOptions });
       return true;
     } catch {
       this.sessions.delete(sessionId);

@@ -23,6 +23,7 @@ import type { ProviderId } from '../llm/router';
 type PanelInboundMessage =
   | { type: 'ready' }
   | { type: 'send'; message: string; mode?: string }
+  | { type: 'cancel' }
   | { type: 'clear' }
   | { type: 'setProvider'; providerId: string }
   | { type: 'setModel'; model: string }
@@ -73,6 +74,9 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           break;
         case 'send':
           await this.handleSend(raw.message, raw.mode);
+          break;
+        case 'cancel':
+          this.cancelRun();
           break;
         case 'clear':
           await this.handleClear();
@@ -204,46 +208,42 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   <title>Buddy</title>
 </head>
 <body>
-  <header class="header">
-    <img class="logo" src="${logoUri}" width="28" height="28" alt="Buddy logo" />
-    <div class="header-text">
-      <div class="title">Buddy</div>
-      <div id="provider-summary" class="subtitle">Loading provider…</div>
-    </div>
+  <header class="topbar">
+    <img class="logo" src="${logoUri}" width="22" height="22" alt="Buddy logo" />
+    <div class="title">Buddy</div>
+    <div class="status"><span id="status-dot" class="dot"></span><span id="status-text">Loading…</span></div>
   </header>
 
-  <div id="messages" class="messages" aria-live="polite"></div>
+  <div id="messages" class="messages" aria-live="polite">
+    <div id="empty-state" class="empty">
+      <div class="empty-title">How can I help?</div>
+      <div class="empty-sub">Ask about your code, plan a change,<br/>or hand off a task.</div>
+    </div>
+  </div>
 
-  <div id="progress" class="progress hidden"></div>
+  <div id="progress" class="statusline hidden"></div>
 
   <footer class="composer">
-    <div class="config-row">
-      <label for="provider">Provider</label>
-      <select id="provider" aria-label="LLM provider"></select>
-      <button id="pick-provider-model" type="button" title="Browse providers and models">⋯</button>
-    </div>
-    <div class="config-row">
-      <label for="model">Model</label>
-      <select id="model" aria-label="LLM model"></select>
-      <button id="pick-model" type="button" title="Choose or enter a custom model">⋯</button>
-    </div>
-    <div class="mode-row">
-      <label for="mode">Mode</label>
-      <select id="mode">
-        <option value="">Agent</option>
-        <option value="think">Think</option>
-        <option value="debug">Debug</option>
-        <option value="plan">Plan</option>
-        <option value="swarm">Swarm</option>
-        <option value="subagent">Subagent</option>
-      </select>
-      <button id="clear" type="button" title="Clear chat">Clear</button>
-    </div>
-    <div class="input-row">
-      <textarea id="input" rows="3" placeholder="Ask Buddy anything about your code…"></textarea>
-      <button id="send" type="button">Send</button>
+    <div class="composer-card">
+      <textarea id="input" rows="1" placeholder="Message Buddy…  (Enter to send, Shift+Enter for a new line)"></textarea>
+      <div class="toolbar">
+        <select id="provider" aria-label="LLM provider"></select>
+        <button id="model-pill" class="pill" type="button" title="Choose model">◇ Select model</button>
+        <select id="mode" aria-label="Agent mode">
+          <option value="">Agent</option>
+          <option value="think">Think</option>
+          <option value="debug">Debug</option>
+          <option value="plan">Plan</option>
+          <option value="swarm">Swarm</option>
+          <option value="subagent">Subagent</option>
+        </select>
+        <span class="spacer"></span>
+        <button id="clear" class="icon-btn" type="button" title="Clear chat">✕</button>
+        <button id="send" class="send-btn" type="button" title="Send">↑</button>
+      </div>
     </div>
   </footer>
+  <div class="hint">Buddy can make mistakes — review diffs before applying.</div>
 
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

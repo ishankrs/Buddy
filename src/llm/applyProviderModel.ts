@@ -3,7 +3,7 @@ import { getProviderDefinition } from './providerCatalog';
 import { getConfiguredModel } from './providerConfig';
 import type { ProviderId } from './router';
 import { ensureOpencodeAvailable } from './opencode/vscode';
-import { ensureApiKey, getApiKey, promptForApiKey } from './secrets';
+import { ensureApiKey, getApiKey, promptForApiKey, promptForBaseUrl } from './secrets';
 
 export async function applyProviderSelection(
   context: vscode.ExtensionContext,
@@ -20,6 +20,19 @@ export async function applyProviderSelection(
     const detection = await ensureOpencodeAvailable(context);
     if (!detection.ok) {
       return false;
+    }
+  }
+
+  if (providerId === 'custom') {
+    // Custom backend needs a base URL. Ask BEFORE switching when none is
+    // stored, so the panel dropdown behaves like the Command Palette flow.
+    const currentUrl = config.get<string>('baseUrl', '').trim();
+    if (!currentUrl) {
+      const baseUrl = await promptForBaseUrl();
+      if (!baseUrl) {
+        return false;
+      }
+      await config.update('baseUrl', baseUrl, vscode.ConfigurationTarget.Global);
     }
   }
 

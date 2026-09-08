@@ -209,6 +209,11 @@
           "default": "",
           "description": "API base URL for the custom provider (e.g. https://api.openai.com/v1 or http://localhost:8080/v1). Required when buddy.provider is custom."
         },
+        "buddy.customName": {
+          "type": "string",
+          "default": "",
+          "description": "Display name for the custom provider endpoint (e.g. My Proxy). Set via the custom setup wizard."
+        },
         "buddy.openaiBaseUrl": {
           "type": "string",
           "default": "",

@@ -48,5 +48,11 @@ export function formatProviderModelSummary(): string {
   const providerId = getConfiguredProviderId();
   const def = getProviderDefinition(providerId);
   const model = resolveModelForProvider(providerId) || 'default model';
+  if (providerId === 'custom') {
+    const name = vscode.workspace.getConfiguration('buddy').get<string>('customName', '').trim();
+    if (name) {
+      return `${name} · ${model}`;
+    }
+  }
   return `${def.label} · ${model}`;
 }

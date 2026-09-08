@@ -55,7 +55,7 @@ Supported providers:
 | OpenRouter | OpenAI-compatible gateway; models like `openai/gpt-4o`, `anthropic/claude-3.5-sonnet`. |
 | OpenCode (Local) (`opencode`) | Optional local agent backend. Uses your locally installed OpenCode CLI via `opencode acp` — no API key in Buddy. Models, auth, and permissions are managed by OpenCode. Optional binary override via `buddy.opencodeBinary`. |
 | Ollama | Local models; no API key. Default URL `http://localhost:11434`. |
-| Custom | Any OpenAI-compatible endpoint. Set `buddy.baseUrl` and `buddy.model`. |
+| Custom | Any OpenAI-compatible endpoint. Guided setup asks for a name, URL, and API key, then saves all three. |
 
 For a self-hosted or proxy API, use **Buddy: Configure API Endpoint (URL + Key)** instead.
 

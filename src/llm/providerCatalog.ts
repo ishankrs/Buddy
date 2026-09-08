@@ -79,7 +79,7 @@ export const PROVIDERS: ProviderDefinition[] = [
   {
     id: 'custom',
     label: 'Custom',
-    description: 'Any OpenAI-compatible API (self-hosted, proxy, etc.)',
+    description: 'Any OpenAI-compatible API — guided setup (name, URL, key)',
     requiresApiKey: true,
     defaultModel: '',
     modelSuggestions: [],

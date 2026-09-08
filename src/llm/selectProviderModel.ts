@@ -14,7 +14,7 @@ import {
   getWorkspacePath,
   nodeManagerDeps,
 } from './opencode/vscode';
-import { ensureApiKey, getApiKey, promptForApiKey, promptForBaseUrl } from './secrets';
+import { configureCustomEndpoint, ensureApiKey, getApiKey, promptForApiKey, promptForBaseUrl } from './secrets';
 
 async function pickProvider(current: ProviderId): Promise<ProviderId | undefined> {
   const picked = await vscode.window.showQuickPick(
@@ -243,12 +243,20 @@ export async function selectProviderAndModel(context: vscode.ExtensionContext): 
 
   const provider = getProviderDefinition(providerId);
 
-  if (!(await ensureCustomBaseUrl(provider))) {
-    return;
-  }
+  if (providerId === 'custom') {
+    // Guided setup: name → URL → API key. Model is picked in the next step.
+    const ok = await configureCustomEndpoint(context);
+    if (!ok) {
+      return;
+    }
+  } else {
+    if (!(await ensureCustomBaseUrl(provider))) {
+      return;
+    }
 
-  if (!(await ensureProviderReady(context, provider))) {
-    return;
+    if (!(await ensureProviderReady(context, provider))) {
+      return;
+    }
   }
 
   if (provider.id === 'opencode') {

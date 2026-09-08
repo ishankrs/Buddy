@@ -64,20 +64,37 @@ export async function promptForBaseUrl(current?: string): Promise<string | undef
   return baseUrl?.trim() || undefined;
 }
 
+export async function promptForCustomName(current?: string): Promise<string | undefined> {
+  const name = await vscode.window.showInputBox({
+    title: 'Buddy: Name this custom endpoint',
+    prompt: 'Give this endpoint a short, memorable name (e.g. My Proxy, Office LLM)',
+    value: current,
+    ignoreFocusOut: true,
+    validateInput: (value) => (value.trim() ? undefined : 'Name is required'),
+  });
+
+  return name?.trim() || undefined;
+}
+
 export async function configureCustomEndpoint(
   context: vscode.ExtensionContext
 ): Promise<boolean> {
   const config = vscode.workspace.getConfiguration('buddy');
-  const currentUrl = config.get<string>('baseUrl', '');
 
+  const name = await promptForCustomName(config.get<string>('customName', ''));
+  if (!name) {
+    return false;
+  }
+
+  const currentUrl = config.get<string>('baseUrl', '');
   const baseUrl = await promptForBaseUrl(currentUrl);
   if (!baseUrl) {
     return false;
   }
 
   const apiKey = await vscode.window.showInputBox({
-    title: 'Buddy: Set API Key',
-    prompt: `Enter the API key for ${baseUrl}`,
+    title: `Buddy: API Key for ${name}`,
+    prompt: `Enter the API key for ${name} (${baseUrl}). Stored locally only, never in settings.`,
     password: true,
     ignoreFocusOut: true,
   });
@@ -86,22 +103,10 @@ export async function configureCustomEndpoint(
     return false;
   }
 
+  await config.update('customName', name, vscode.ConfigurationTarget.Global);
   await config.update('baseUrl', baseUrl, vscode.ConfigurationTarget.Global);
   await config.update('provider', 'custom', vscode.ConfigurationTarget.Global);
   await setApiKey(context, 'custom', apiKey);
-
-  const model = config.get<string>('model', '');
-  if (!model) {
-    const modelName = await vscode.window.showInputBox({
-      title: 'Buddy: Set Model Name',
-      prompt: 'Enter the model name for this endpoint',
-      placeHolder: 'gpt-4o',
-      ignoreFocusOut: true,
-    });
-    if (modelName?.trim()) {
-      await config.update('model', modelName.trim(), vscode.ConfigurationTarget.Global);
-    }
-  }
 
   return true;
 }

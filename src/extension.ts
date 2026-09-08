@@ -150,7 +150,23 @@ function registerCoreCommands(context: vscode.ExtensionContext): void {
       }
 
       if (selected === 'custom') {
-        await configureCustomEndpoint(context);
+        const ok = await configureCustomEndpoint(context);
+        if (!ok) {
+          vscode.window.showInformationMessage('Buddy: Custom endpoint setup cancelled.');
+          return;
+        }
+        const model = config.get<string>('model', '');
+        if (!model) {
+          const modelName = await vscode.window.showInputBox({
+            title: 'Buddy: Set Model Name',
+            prompt: 'Enter the model name for this endpoint',
+            placeHolder: 'gpt-4o',
+            ignoreFocusOut: true,
+          });
+          if (modelName?.trim()) {
+            await config.update('model', modelName.trim(), vscode.ConfigurationTarget.Global);
+          }
+        }
         vscode.window.showInformationMessage('Buddy: Custom endpoint configured.');
         return;
       }

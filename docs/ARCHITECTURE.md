@@ -259,6 +259,8 @@ Buddy optionally drives a locally installed OpenCode CLI instead of calling
 model APIs directly. One `opencode acp` child process serves the extension
 host; Buddy keeps one OpenCode session per workspace (id persisted in
 globalState, resumed via `session/resume`, closed on conversation clear).
+The panel header lists previous chats (`session/list`); switching resumes
+the session and replays its history (`session/load`) into the view.
 
 ```mermaid
 sequenceDiagram

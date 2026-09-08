@@ -71,6 +71,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 60%;
+  min-width: 0;
 }
 
 .status .dot {
@@ -83,6 +84,36 @@ body {
 
 .status .dot.busy {
   background: var(--vscode-testing-iconQueued, #d29922);
+}
+
+.session-select {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--buddy-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  cursor: pointer;
+  padding: 2px 0;
+  text-overflow: ellipsis;
+}
+
+.session-select:hover:not(:disabled) {
+  color: var(--buddy-muted);
+}
+
+.session-select option {
+  background: var(--vscode-quickInput-background, var(--buddy-card));
+  color: var(--buddy-fg);
+  font-weight: 400;
+}
+
+#status-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- messages ---------- */

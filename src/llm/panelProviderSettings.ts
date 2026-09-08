@@ -6,7 +6,7 @@ import {
   getConfiguredProviderId,
   getProviderDefinition,
 } from './providerConfig';
-import { getSharedManager } from './opencode/manager';
+import { getSharedManager, type OpenCodeProcessManager } from './opencode/manager';
 import { OpenCodeError } from './opencode/acp';
 import { getWorkspacePath, nodeManagerDeps } from './opencode/vscode';
 import type { ProviderId } from './router';
@@ -15,6 +15,12 @@ export interface PanelModelOption {
   value: string;
   label: string;
   group?: string;
+}
+
+export interface PanelSessionOption {
+  id: string;
+  title: string;
+  current: boolean;
 }
 
 export interface PanelLlmConfig {
@@ -27,6 +33,8 @@ export interface PanelLlmConfig {
   /** True when the opencode dropdown still needs its live list fetched. */
   modelsLoading: boolean;
   modelsError?: string;
+  /** Previous OpenCode chats (opencode provider only; absent when unavailable). */
+  sessions?: PanelSessionOption[];
 }
 
 function baseConfig(): Omit<PanelLlmConfig, 'models' | 'modelsLoading' | 'modelsError'> {
@@ -70,10 +78,30 @@ export function getPanelLlmConfig(): PanelLlmConfig {
   };
 }
 
+/** Previous chats for the session dropdown; undefined when unavailable. */
+async function loadSessionOptions(
+  manager: OpenCodeProcessManager,
+  workspacePath: string
+): Promise<PanelSessionOption[] | undefined> {
+  try {
+    const sessions = await manager.listSessions(workspacePath);
+    if (sessions.length === 0) {
+      return [];
+    }
+    const current = manager.currentSessionId(workspacePath);
+    return sessions.map((s) => ({
+      id: s.sessionId,
+      title: s.title?.trim() || 'Untitled chat',
+      current: s.sessionId === current,
+    }));
+  } catch {
+    return undefined;
+  }
+}
 /**
- * Full config with models from the local OpenCode installation (flat list,
- * exactly as OpenCode advertises them). Falls back to the configured model
- * with `modelsError` when OpenCode is missing or unreachable.
+ * Full config with models and previous chats from the local OpenCode
+ * installation. Falls back to the configured model with `modelsError`
+ * when OpenCode is missing or unreachable.
  */
 export async function getPanelLlmConfigWithLiveModels(
   context: vscode.ExtensionContext
@@ -86,7 +114,8 @@ export async function getPanelLlmConfigWithLiveModels(
 
   try {
     const manager = getSharedManager(nodeManagerDeps(context));
-    const listed = await manager.getModelOptions(getWorkspacePath());
+    const workspacePath = getWorkspacePath();
+    const listed = await manager.getModelOptions(workspacePath);
     const effectiveCurrent = base.model || listed.current;
     const options: PanelModelOption[] = listed.options.map((m) => ({
       value: m.value,
@@ -99,7 +128,13 @@ export async function getPanelLlmConfigWithLiveModels(
         group: 'Current',
       });
     }
-    return { ...base, model: effectiveCurrent, models: options, modelsLoading: false };
+    return {
+      ...base,
+      model: effectiveCurrent,
+      models: options,
+      modelsLoading: false,
+      sessions: await loadSessionOptions(manager, workspacePath),
+    };
   } catch (err) {
     const message =
       err instanceof OpenCodeError && err.kind === 'not-installed'

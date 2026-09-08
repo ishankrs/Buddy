@@ -31,7 +31,8 @@ type PanelInboundMessage =
   | { type: 'setModel'; model: string }
   | { type: 'pickProviderModel' }
   | { type: 'pickModel' }
-  | { type: 'searchFiles'; query: string; requestId: number };
+  | { type: 'searchFiles'; query: string; requestId: number }
+  | { type: 'switchSession'; sessionId: string };
 
 export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'buddy.panel';
@@ -119,6 +120,9 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
           this.post({ type: 'fileResults', requestId: raw.requestId, files });
           break;
         }
+        case 'switchSession':
+          await this.handleSwitchSession(raw.sessionId);
+          break;
       }
     });
   }
@@ -145,6 +149,37 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
     this.cancelRun();
     await startFreshConversation(this.context, this.memory);
     this.post({ type: 'cleared' });
+    this.pushLlmConfig();
+  }
+
+  /**
+   * Switch to a previous OpenCode chat: resume it, clear Buddy's own memory
+   * (so context matches the resumed session), and replay its history into
+   * the view so the user can continue where they left off.
+   */
+  private async handleSwitchSession(sessionId: string): Promise<void> {
+    this.cancelRun();
+    const workspacePath = getWorkspacePath();
+    const manager = getSharedManager(nodeManagerDeps(this.context));
+    this.post({ type: 'progress', text: 'Switching conversation…' });
+    try {
+      const ok = await manager.useSession(workspacePath, sessionId);
+      if (!ok) {
+        this.post({ type: 'error', text: 'Could not resume that conversation — it may no longer exist.' });
+        this.pushLlmConfig();
+        return;
+      }
+      await this.memory.clear();
+      this.post({ type: 'cleared' });
+      const items = await manager.loadHistory(workspacePath, sessionId);
+      this.post({ type: 'history', items });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.post({ type: 'error', text: `Could not load that conversation. ${message}` });
+    } finally {
+      this.post({ type: 'assistantDone' });
+      this.pushLlmConfig();
+    }
   }
 
   private cancelRun(): void {
@@ -213,7 +248,7 @@ export class BuddyPanelProvider implements vscode.WebviewViewProvider {
   <header class="topbar">
     <img class="logo" src="${logoUri}" width="22" height="22" alt="Buddy logo" />
     <div class="title">Buddy</div>
-    <div class="status"><span id="status-dot" class="dot"></span><span id="status-text">Loading…</span></div>
+    <div class="status"><span id="status-dot" class="dot"></span><select id="session" class="session-select" aria-label="Conversation"></select><span id="status-text">Loading…</span></div>
   </header>
 
   <div id="messages" class="messages" aria-live="polite">

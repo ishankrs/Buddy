@@ -12,6 +12,7 @@
   const modelPill = document.getElementById('model-pill');
   const statusTextEl = document.getElementById('status-text');
   const statusDotEl = document.getElementById('status-dot');
+  const sessionEl = document.getElementById('session');
   const mentionEl = document.getElementById('mention-popup');
 
   let assistantBody = null;
@@ -294,6 +295,54 @@
     row.appendChild(box);
   }
 
+  function renderHistory(items) {
+    messagesEl.innerHTML = '';
+    assistantBody = null;
+    assistantText = '';
+    for (const item of items || []) {
+      if (item.kind === 'user') {
+        if (!item.text.trim()) {
+          continue;
+        }
+        const row = appendRow('user');
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = item.text;
+        row.appendChild(bubble);
+      } else {
+        for (const thought of item.thoughts || []) {
+          if (thought.trim()) {
+            appendThinking(thought);
+          }
+        }
+        for (const tool of item.tools || []) {
+          appendActivity(toolStatusIcon(tool.status) + ' ' + (tool.title || 'tool'));
+        }
+        if (item.text.trim()) {
+          const row = appendRow('assistant');
+          const body = document.createElement('div');
+          body.className = 'prose';
+          body.innerHTML = renderMarkdown(item.text);
+          row.appendChild(body);
+        }
+      }
+    }
+    if (messagesEl.children.length === 0 && emptyEl) {
+      messagesEl.appendChild(emptyEl);
+      emptyEl.style.display = '';
+    }
+  }
+
+  function toolStatusIcon(status) {
+    if (status === 'completed') {
+      return '✓';
+    }
+    if (status === 'failed') {
+      return '✗';
+    }
+    return '🔧';
+  }
+
   /* ---------------- config ---------------- */
 
   function fillProviders(providers, selectedId) {
@@ -313,14 +362,51 @@
     syncingConfig = true;
     fillProviders(config.providers || [], config.providerId);
     currentSummary = config.summary || '';
-    statusTextEl.textContent = config.modelsError
-      ? '⚠ ' + config.modelsError
-      : currentSummary;
     statusTextEl.title = currentSummary;
+    renderSessionSelect(config);
     const label = config.model || 'Select model';
     modelPill.textContent = '◇ ' + label;
     modelPill.title = config.modelsError || ('Model: ' + label + ' — click to change');
     syncingConfig = false;
+  }
+
+  function shortSessionTitle(title) {
+    const clean = (title || 'Untitled chat').trim() || 'Untitled chat';
+    return clean.length > 42 ? clean.slice(0, 41) + '…' : clean;
+  }
+
+  function renderSessionSelect(config) {
+    const sessions = config.sessions;
+    if (!sessions) {
+      // Non-opencode providers (or unavailable list): static summary text.
+      sessionEl.style.display = 'none';
+      statusTextEl.style.display = '';
+      statusTextEl.textContent = config.modelsError
+        ? '⚠ ' + config.modelsError
+        : currentSummary;
+      return;
+    }
+    statusTextEl.style.display = 'none';
+    sessionEl.style.display = '';
+    sessionEl.innerHTML = '';
+    const current = sessions.find((s) => s.current);
+    const fresh = document.createElement('option');
+    fresh.value = '__new__';
+    fresh.textContent = '＋ New chat';
+    sessionEl.appendChild(fresh);
+    for (const s of sessions) {
+      const el = document.createElement('option');
+      el.value = s.id;
+      el.textContent = shortSessionTitle(s.title);
+      if (s.current) {
+        el.selected = true;
+      }
+      sessionEl.appendChild(el);
+    }
+    if (!current) {
+      sessionEl.value = '__new__';
+    }
+    sessionEl.title = currentSummary;
   }
 
   /* ---------------- messaging ---------------- */
@@ -365,6 +451,19 @@
       return;
     }
     vscode.postMessage({ type: 'setProvider', providerId: providerEl.value });
+  });
+
+  sessionEl.addEventListener('change', () => {
+    if (syncingConfig) {
+      return;
+    }
+    if (sessionEl.value === '__new__') {
+      vscode.postMessage({ type: 'clear' });
+      return;
+    }
+    setBusy(true);
+    setStatus('Switching conversation…');
+    vscode.postMessage({ type: 'switchSession', sessionId: sessionEl.value });
   });
 
   modelPill.addEventListener('click', () => {
@@ -569,6 +668,9 @@
         break;
       case 'fileResults':
         showMentionResults(msg.requestId, msg.files);
+        break;
+      case 'history':
+        renderHistory(msg.items);
         break;
       case 'userMessage': {
         const row = appendRow('user');

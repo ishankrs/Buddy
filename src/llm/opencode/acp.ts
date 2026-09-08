@@ -78,6 +78,35 @@ export interface SessionConfigOption {
   options: ModelOption[];
 }
 
+export interface SessionSummary {
+  sessionId: string;
+  title?: string;
+  cwd?: string;
+  updatedAt?: string;
+}
+
+export interface ReplayTool {
+  title: string;
+  status: string;
+}
+
+export interface ReplayItem {
+  kind: 'user' | 'assistant';
+  text: string;
+  thoughts: string[];
+  tools: ReplayTool[];
+}
+
+interface AgentCapabilities {
+  loadSession?: boolean;
+  sessionCapabilities?: {
+    close?: unknown;
+    fork?: unknown;
+    list?: unknown;
+    resume?: unknown;
+  };
+}
+
 export interface AcpToolEvent {
   toolCallId: string;
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled';
@@ -109,6 +138,8 @@ export class AcpClient {
   private exited: number | null | undefined;
   private readonly sessions = new Map<string, SessionState>();
   private readonly activePrompts = new Map<string, PromptSink>();
+  private readonly activeLoads = new Map<string, (update: AcpUpdate) => void>();
+  private capabilities: AgentCapabilities = {};
   private agentName = 'OpenCode';
 
   constructor(
@@ -161,6 +192,9 @@ export class AcpClient {
       });
       if (result?.agentInfo?.name) {
         this.agentName = String(result.agentInfo.name);
+      }
+      if (result?.agentCapabilities && typeof result.agentCapabilities === 'object') {
+        this.capabilities = result.agentCapabilities as AgentCapabilities;
       }
     } catch (err) {
       const message =
@@ -296,6 +330,164 @@ export class AcpClient {
     this.peer?.notify('session/cancel', { sessionId });
   }
 
+  /** List known OpenCode sessions (newest activity first, per the backend). */
+  async listSessions(cwd?: string): Promise<SessionSummary[]> {
+    if (!this.capabilities.sessionCapabilities?.list) {
+      throw new OpenCodeError(
+        'The installed OpenCode version does not support listing sessions — update OpenCode and try again.',
+        'protocol-error'
+      );
+    }
+    const peer = this.requirePeer();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await peer.call<any>('session/list', cwd ? { cwd } : {});
+      const sessions: Record<string, unknown>[] = Array.isArray(result?.sessions)
+        ? result.sessions.filter(
+            (s: unknown): s is Record<string, unknown> => !!s && typeof s === 'object'
+          )
+        : [];
+      return sessions
+        .map((s) => ({
+          sessionId: String(s.sessionId ?? ''),
+          title: typeof s.title === 'string' ? s.title : undefined,
+          cwd: typeof s.cwd === 'string' ? s.cwd : undefined,
+          updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : undefined,
+        }))
+        .filter((s) => s.sessionId);
+    } catch (err) {
+      throw this.wrapCallError(err, 'list OpenCode sessions');
+    }
+  }
+
+  /**
+   * Load a session, replaying its history into ordered items (user and
+   * assistant turns with thoughts and tool activity). Also refreshes the
+   * cached config options, which `session/load` returns.
+   */
+  async loadSession(
+    sessionId: string,
+    cwd: string
+  ): Promise<{ configOptions: SessionConfigOption[]; items: ReplayItem[] }> {
+    if (!this.capabilities.loadSession) {
+      throw new OpenCodeError(
+        'The installed OpenCode version does not support loading sessions — update OpenCode and try again.',
+        'protocol-error'
+      );
+    }
+    const peer = this.requirePeer();
+    const items: ReplayItem[] = [];
+    let current: ReplayItem | undefined;
+    let currentKind: 'user' | 'assistant' | undefined;
+    let currentId: string | undefined;
+    let thoughtId: string | undefined;
+
+    const forTurn = (kind: 'user' | 'assistant', id: string | undefined): ReplayItem => {
+      if (!current || currentKind !== kind || currentId !== id) {
+        current = { kind, text: '', thoughts: [], tools: [] };
+        currentKind = kind;
+        currentId = id;
+        items.push(current);
+      }
+      return current;
+    };
+
+    // Tool events rarely carry a message id — attach id-less ones to the
+    // ongoing assistant turn instead of fragmenting the replay.
+    const forTool = (id: string | undefined): ReplayItem => {
+      if (current && currentKind === 'assistant' && (id === undefined || currentId === id)) {
+        return current;
+      }
+      return forTurn('assistant', id);
+    };
+
+    this.activeLoads.set(sessionId, (update) => {
+      const id = update.messageId;
+      switch (update.sessionUpdate) {
+        case 'user_message_chunk': {
+          const text = contentText(update.content);
+          if (text) {
+            forTurn('user', id).text += text;
+          }
+          break;
+        }
+        case 'agent_message_chunk': {
+          const text = contentText(update.content);
+          if (text) {
+            forTurn('assistant', id).text += text;
+          }
+          break;
+        }
+        case 'agent_thought_chunk': {
+          const text = contentText(update.content);
+          if (text) {
+            const turn = forTurn('assistant', id);
+            if (thoughtId !== id) {
+              thoughtId = id;
+              turn.thoughts.push(text);
+            } else {
+              turn.thoughts[turn.thoughts.length - 1] += text;
+            }
+          }
+          break;
+        }
+        case 'tool_call': {
+          const turn = forTool(id);
+          const tool: ReplayTool & { callId?: string } = {
+            title: update.title ?? 'tool',
+            status: 'pending',
+            callId: update.toolCallId !== undefined ? String(update.toolCallId) : undefined,
+          };
+          turn.tools.push(tool);
+          break;
+        }
+        case 'tool_call_update': {
+          const turn = forTool(id);
+          const callId = update.toolCallId !== undefined ? String(update.toolCallId) : undefined;
+          const existing = [...turn.tools]
+            .reverse()
+            .find(
+              (t) =>
+                (t as ReplayTool & { callId?: string }).callId === callId ||
+                (callId === undefined && t.status === 'pending')
+            );
+          if (existing) {
+            existing.status = update.status ?? existing.status;
+            if (update.title) {
+              existing.title = update.title;
+            }
+          } else {
+            turn.tools.push({ title: update.title ?? 'tool', status: update.status ?? 'pending' });
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    });
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await peer.call<any>('session/load', {
+        sessionId,
+        cwd,
+        mcpServers: [],
+      });
+      const configOptions = Array.isArray(result?.configOptions)
+        ? (result.configOptions as SessionConfigOption[])
+        : this.getCachedConfig(sessionId);
+      this.sessions.set(sessionId, { sessionId, configOptions });
+      return {
+        configOptions,
+        items: items.filter((item) => item.text.trim() || item.thoughts.length > 0 || item.tools.length > 0),
+      };
+    } catch (err) {
+      throw this.wrapCallError(err, 'load the OpenCode session');
+    } finally {
+      this.activeLoads.delete(sessionId);
+    }
+  }
+
   async closeSession(sessionId: string): Promise<void> {
     this.sessions.delete(sessionId);
     this.activePrompts.delete(sessionId);
@@ -360,9 +552,17 @@ export class AcpClient {
       return;
     }
     const sink = this.activePrompts.get(sessionId);
-    if (!sink) {
+    if (sink) {
+      this.routePromptUpdate(sink, update);
       return;
     }
+    const load = this.activeLoads.get(sessionId);
+    if (load) {
+      load(update);
+    }
+  }
+
+  private routePromptUpdate(sink: PromptSink, update: AcpUpdate): void {
     switch (update.sessionUpdate) {
       case 'agent_message_chunk': {
         const text = contentText(update.content);
@@ -436,6 +636,7 @@ export class AcpClient {
 
 interface AcpUpdate {
   sessionUpdate: string;
+  messageId?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content?: any;
   toolCallId?: string | number;

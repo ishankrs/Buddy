@@ -14,7 +14,9 @@ import {
   AcpClient,
   OpenCodeError,
   type PermissionResolver,
+  type ReplayItem,
   type SessionConfigOption,
+  type SessionSummary,
   type SpawnDeps,
 } from './acp';
 import { findOpencodeBinary, type ExecDeps } from './detector';
@@ -149,6 +151,39 @@ export class OpenCodeProcessManager {
     if (stored && this.client?.running) {
       await this.client.closeSession(stored);
     }
+  }
+
+  /** Currently mapped OpenCode session for a workspace, if any. */
+  currentSessionId(workspacePath: string): string | undefined {
+    return this.deps.store.get(sessionStoreKey(workspacePath));
+  }
+
+  /** Previous OpenCode sessions known to the local backend. */
+  async listSessions(workspacePath: string): Promise<SessionSummary[]> {
+    await this.ensureRunning();
+    return this.requireClient().listSessions(workspacePath);
+  }
+
+  /**
+   * Switch the workspace to an existing OpenCode session: resume it and
+   * remember the mapping. Returns false when the session cannot be resumed.
+   */
+  async useSession(workspacePath: string, sessionId: string): Promise<boolean> {
+    await this.ensureRunning();
+    const client = this.requireClient();
+    const resumed = await client.resumeSession(sessionId, workspacePath);
+    if (!resumed) {
+      return false;
+    }
+    await this.deps.store.set(sessionStoreKey(workspacePath), sessionId);
+    return true;
+  }
+
+  /** Load a session's history for display (does not change the mapping). */
+  async loadHistory(workspacePath: string, sessionId: string): Promise<ReplayItem[]> {
+    await this.ensureRunning();
+    const { items } = await this.requireClient().loadSession(sessionId, workspacePath);
+    return items;
   }
 
   /** Serialized prompt turn on an already-ensured session. */

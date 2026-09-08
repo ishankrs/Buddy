@@ -73,6 +73,14 @@ function fakeClient(options: FakeClientOptions = {}) {
       return [];
     },
     getModelOptions: () => ({ current: 'm', options: [{ value: 'm', name: 'M' }] }),
+    listSessions: async () => {
+      calls.push('list');
+      return [{ sessionId: 'ses_old', title: 'Old chat' }];
+    },
+    loadSession: async () => {
+      calls.push('load');
+      return { configOptions: [], items: [] };
+    },
     dispose: async () => {
       calls.push('dispose');
     },
@@ -159,6 +167,42 @@ describe('OpenCodeProcessManager', () => {
     // Reset (close) + recreate happened before giving up.
     assert.ok(calls.includes('close:ses_1'));
     assert.equal(calls.filter((c) => c === 'create').length, 2);
+  });
+
+  it('switches workspaces to a previous session and remembers it', async () => {
+    const d = deps();
+    const { client } = fakeClient();
+    const manager = new OpenCodeProcessManager(d);
+    manager.setClientFactory(() => client);
+    assert.equal(manager.currentSessionId('/work/a'), undefined);
+    const ok = await manager.useSession('/work/a', 'ses_old');
+    assert.equal(ok, true);
+    assert.equal(manager.currentSessionId('/work/a'), 'ses_old');
+    // Next prompt uses the switched session without creating a new one.
+    const ensured = await manager.ensureSession('/work/a');
+    assert.deepEqual(ensured, { sessionId: 'ses_old', created: false });
+  });
+
+  it('useSession reports failure without storing', async () => {
+    const d = deps();
+    const { client } = fakeClient({ resumeOk: false });
+    const manager = new OpenCodeProcessManager(d);
+    manager.setClientFactory(() => client);
+    assert.equal(await manager.useSession('/work/a', 'ses_gone'), false);
+    assert.equal(manager.currentSessionId('/work/a'), undefined);
+  });
+
+  it('lists previous sessions and loads history', async () => {
+    const d = deps();
+    const { calls, client } = fakeClient();
+    const manager = new OpenCodeProcessManager(d);
+    manager.setClientFactory(() => client);
+    const sessions = await manager.listSessions('/work/a');
+    assert.deepEqual(sessions, [{ sessionId: 'ses_old', title: 'Old chat' }]);
+    const items = await manager.loadHistory('/work/a', 'ses_old');
+    assert.deepEqual(items, []);
+    assert.ok(calls.includes('list'));
+    assert.ok(calls.includes('load'));
   });
 
   it('dispose() tears down the client', async () => {

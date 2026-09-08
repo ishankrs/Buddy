@@ -8,6 +8,7 @@ export type WebviewOutboundMessage =
   | { type: 'assistantDone' }
   | { type: 'error'; text: string }
   | { type: 'cleared' }
+  | { type: 'history'; items: import('../llm/opencode/acp').ReplayItem[] }
   | { type: 'fileResults'; requestId: number; files: Array<{ label: string; detail: string }> }
   | { type: 'llmConfig'; config: import('../llm/panelProviderSettings').PanelLlmConfig };
 

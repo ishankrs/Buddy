@@ -68,6 +68,8 @@ For a self-hosted or proxy API, use **Buddy: Configure API Endpoint (URL + Key)*
 > 3. Pick a model from the list Buddy reads from your local OpenCode (saved to `buddy.model`, e.g. `opencode/big-pickle`; empty means your OpenCode default).
 >
 > How it works: Buddy spawns `opencode acp` and talks to it over JSON-RPC/stdio. One OpenCode session is kept per workspace (resumed across restarts, closed on **Clear Conversation Memory**). Tool calls run inside OpenCode under your OpenCode permissions — OpenCode asks via Buddy before privileged actions. Buddy never requests, stores, logs, or proxies OpenCode credentials, and sends no OpenCode traffic through any Buddy server.
+>
+> The header shows a **conversation dropdown** instead of a static label: pick any previous OpenCode chat to resume it — Buddy replays its history into the panel so you can continue where you left off — or start a ＋ New chat.
 
 ## Using Buddy
 

@@ -54,7 +54,17 @@ class FakeOpenCode implements SpawnedProcess {
 
   private handle(msg: Incoming): void {
     if (msg.method === 'initialize') {
-      this.emit({ jsonrpc: '2.0', id: msg.id, result: { protocolVersion: 1, agentCapabilities: {} } });
+      this.emit({
+        jsonrpc: '2.0',
+        id: msg.id,
+        result: {
+          protocolVersion: 1,
+          agentCapabilities: {
+            loadSession: true,
+            sessionCapabilities: { list: {}, resume: {}, close: {} },
+          },
+        },
+      });
       return;
     }
     if (msg.method === 'session/new') {
@@ -92,6 +102,39 @@ class FakeOpenCode implements SpawnedProcess {
           ],
         },
       });
+      return;
+    }
+    if (msg.method === 'session/list') {
+      this.emit({
+        jsonrpc: '2.0',
+        id: msg.id,
+        result: {
+          sessions: [
+            { sessionId: 'ses_a', title: 'First chat', cwd: '/tmp', updatedAt: '2026-09-08T00:00:00Z' },
+            { sessionId: 'ses_b', title: '', cwd: '/tmp' },
+            { nope: true },
+          ],
+        },
+      });
+      return;
+    }
+    if (msg.method === 'session/load') {
+      const sid = ((msg.params ?? {}) as { sessionId: string }).sessionId;
+      const updates = [
+        { sessionUpdate: 'user_message_chunk', messageId: 'u1', content: { type: 'text', text: 'hello ' } },
+        { sessionUpdate: 'user_message_chunk', messageId: 'u1', content: { type: 'text', text: 'there' } },
+        { sessionUpdate: 'agent_thought_chunk', messageId: 'm1', content: { type: 'text', text: 'think' } },
+        { sessionUpdate: 'agent_thought_chunk', messageId: 'm1', content: { type: 'text', text: 'ing' } },
+        { sessionUpdate: 'tool_call', toolCallId: 'c1', title: 'read', status: 'pending' },
+        { sessionUpdate: 'tool_call_update', toolCallId: 'c1', status: 'completed', title: 'read foo' },
+        { sessionUpdate: 'agent_message_chunk', messageId: 'm1', content: { type: 'text', text: 'answer' } },
+        { sessionUpdate: 'agent_message_chunk', messageId: 'm2', content: { type: 'text', text: 'more' } },
+        { sessionUpdate: 'usage_update', used: 1, size: 2 },
+      ];
+      for (const update of updates) {
+        this.emit({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: sid, update } });
+      }
+      this.emit({ jsonrpc: '2.0', id: msg.id, result: { configOptions: [] } });
       return;
     }
     if (msg.method === 'session/set_config_option') {
@@ -313,6 +356,30 @@ describe('AcpClient', () => {
       current: 'opencode/big-pickle',
       options: fake.modelOptions,
     });
+  });
+
+  it('lists previous sessions, skipping malformed entries', async () => {
+    await started();
+    const sessions = await client.listSessions('/tmp');
+    assert.deepEqual(sessions, [
+      { sessionId: 'ses_a', title: 'First chat', cwd: '/tmp', updatedAt: '2026-09-08T00:00:00Z' },
+      { sessionId: 'ses_b', title: '', cwd: '/tmp', updatedAt: undefined },
+    ]);
+  });
+
+  it('loads a session into grouped replay items', async () => {
+    await started();
+    const { items } = await client.loadSession('ses_a', '/tmp');
+    assert.deepEqual(items, [
+      { kind: 'user', text: 'hello there', thoughts: [], tools: [] },
+      {
+        kind: 'assistant',
+        text: 'answer',
+        thoughts: ['thinking'],
+        tools: [{ title: 'read foo', status: 'completed', callId: 'c1' }],
+      },
+      { kind: 'assistant', text: 'more', thoughts: [], tools: [] },
+    ]);
   });
 
   it('closeSession forgets the session', async () => {

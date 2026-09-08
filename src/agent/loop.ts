@@ -112,7 +112,15 @@ async function runAgentLoopInner(
       tools,
       options.token,
       options.stream,
-      useThinkStream
+      useThinkStream,
+      (thinking) => {
+        const panel = options.stream as unknown as {
+          thinking?: (text: string) => void;
+        };
+        if (typeof panel.thinking === 'function') {
+          panel.thinking(thinking);
+        }
+      }
     );
 
     if (turn.text) {
@@ -280,7 +288,8 @@ async function collectTurn(
   tools: ReturnType<typeof getToolSchemas>,
   token: vscode.CancellationToken,
   stream: vscode.ChatResponseStream,
-  useThinkStream: boolean
+  useThinkStream: boolean,
+  onThinking?: (text: string) => void
 ): Promise<{
   text: string;
   toolCalls: Array<{ id: string; name: string; arguments: string }>;
@@ -307,6 +316,8 @@ async function collectTurn(
         if (thinkSplitter) {
           thinkSplitter.feed(chunk.text, stream);
         }
+      } else if (chunk.type === 'thinking') {
+        onThinking?.(chunk.text);
       } else if (chunk.type === 'activity') {
         stream.progress(chunk.text);
       } else if (chunk.type === 'tool_call') {

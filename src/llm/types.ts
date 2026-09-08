@@ -60,7 +60,21 @@ export interface StreamActivityChunk {
   text: string;
 }
 
-export type StreamChunk = StreamTextChunk | StreamToolCallChunk | StreamDoneChunk | StreamActivityChunk;
+/**
+ * A complete block of agent reasoning (accumulated thought deltas).
+ * Rendered as one collapsible thinking block, never as answer text.
+ */
+export interface StreamThinkingChunk {
+  type: 'thinking';
+  text: string;
+}
+
+export type StreamChunk =
+  | StreamTextChunk
+  | StreamToolCallChunk
+  | StreamDoneChunk
+  | StreamActivityChunk
+  | StreamThinkingChunk;
 
 export interface LLMProvider {
   id: string;

@@ -138,10 +138,11 @@ describe('createOpencodeLocalProvider', () => {
     assert.deepEqual(seenModels, ['other/model-x']);
   });
 
-  it('surfaces thoughts as activity chunks, never as answer text', async () => {
+  it('buffers thought deltas into one thinking block, never answer text', async () => {
     const { manager } = fakeManager({
       chunks: [
-        { kind: 'activity', text: 'reasoning here' },
+        { kind: 'activity', text: 'reasoning ' },
+        { kind: 'activity', text: 'here' },
         { kind: 'text', text: 'final' },
       ],
     });
@@ -153,7 +154,7 @@ describe('createOpencodeLocalProvider', () => {
     });
     const chunks = await collect(provider, messages);
     assert.deepEqual(chunks, [
-      { type: 'activity', text: 'Thinking: reasoning here' },
+      { type: 'thinking', text: 'reasoning here' },
       { type: 'text', text: 'final' },
       { type: 'done', stopReason: 'end' },
     ]);

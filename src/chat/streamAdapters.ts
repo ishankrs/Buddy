@@ -13,12 +13,17 @@ export type WebviewOutboundMessage =
 
 export function createWebviewResponseStream(
   post: (msg: WebviewOutboundMessage) => void
-): vscode.ChatResponseStream {
+): vscode.ChatResponseStream & { thinking(text: string): void } {
   return {
     markdown(value) {
       const text = typeof value === 'string' ? value : value.value;
       if (text) {
         post({ type: 'assistantChunk', text });
+      }
+    },
+    thinking(text) {
+      if (text.trim()) {
+        post({ type: 'assistantThinking', text });
       }
     },
     progress(value) {

@@ -154,18 +154,31 @@ export function createOpencodeLocalProvider(
       const queue: StreamChunk[] = [];
       let done = false;
       let failure: unknown;
+      // Thought deltas arrive in tiny fragments; buffer them and flush one
+      // complete thinking block when the thought phase ends (first text,
+      // tool event, or turn end) instead of a row per delta.
+      let thoughtBuf = '';
+      const flushThought = () => {
+        const text = thoughtBuf.trim();
+        thoughtBuf = '';
+        if (text) {
+          queue.push({ type: 'thinking', text });
+        }
+      };
       void manager
         .promptOnSession(
           sessionId,
           text,
           {
             onText: (delta) => {
+              flushThought();
               queue.push({ type: 'text', text: delta });
             },
             onThought: (thought) => {
-              queue.push({ type: 'activity', text: `Thinking: ${truncate(thought, 200)}` });
+              thoughtBuf += thought;
             },
             onTool: (event) => {
+              flushThought();
               const title = event.title ? ` ${truncate(event.title, 80)}` : '';
               if (event.status === 'pending') {
                 queue.push({ type: 'activity', text: `🔧 Running${title}…` });
@@ -180,9 +193,11 @@ export function createOpencodeLocalProvider(
         )
         .then(
           () => {
+            flushThought();
             done = true;
           },
           (err) => {
+            flushThought();
             failure = err;
             done = true;
           }
